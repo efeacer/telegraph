@@ -572,9 +572,14 @@ button:focus-visible {
   flex-direction: column;
   justify-content: center;
   height: 100%;
-  max-width: 640px;
-  padding: 0 0 10% 12%;
+  padding: 0 12% 10%;
   background: var(--well);
+  /* Nothing else is left to move the window by. */
+  -webkit-app-region: drag;
+}
+
+.failure button {
+  -webkit-app-region: no-drag;
 }
 
 .failure h1 {

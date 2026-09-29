@@ -1,23 +1,11 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { clip, describeProblem } from '@shared/buglog'
-import { report } from '../problems'
+import { Component, type ReactNode } from 'react'
 
-const COMPONENT_STACK_LIMIT = 2_000
-
-/** Stands in for the window when it cannot be drawn, and says why in the bug log. */
+/** Stands in for the window when it cannot be drawn. The error itself is reported where React is started. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true }
-  }
-
-  componentDidCatch(error: unknown, info: ErrorInfo): void {
-    void report({
-      kind: 'render-error',
-      ...describeProblem(error),
-      detail: { components: clip(info.componentStack ?? '', COMPONENT_STACK_LIMIT) }
-    })
   }
 
   render(): ReactNode {

@@ -1,8 +1,9 @@
-import { describeProblem, type WindowReport } from '@shared/buglog'
+import { clip, describeProblem, type WindowReport } from '@shared/buglog'
 
 // Chromium raises this when a resize handler causes another resize. The
 // notifications arrive a frame later and nothing is lost.
 const HARMLESS = /^ResizeObserver loop/
+const COMPONENT_STACK_LIMIT = 2_000
 
 /** Resolves to false when the report could not be saved. */
 export async function report(problem: WindowReport): Promise<boolean> {
@@ -12,6 +13,17 @@ export async function report(problem: WindowReport): Promise<boolean> {
     // Reporting this would only fail the same way.
     return false
   }
+}
+
+/** For React to call with an error from drawing the window. */
+export function reportRenderError(error: unknown, info: { componentStack?: string }): void {
+  // A warning, because the main process records what the console calls an error.
+  console.warn(error)
+  void report({
+    kind: 'render-error',
+    ...describeProblem(error),
+    detail: { components: clip(info.componentStack ?? '', COMPONENT_STACK_LIMIT) }
+  })
 }
 
 function describeEvent(event: ErrorEvent): Omit<WindowReport, 'kind'> {

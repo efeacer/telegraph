@@ -1,5 +1,5 @@
 // First, so that it hears of errors in everything that loads after it.
-import './problems'
+import { reportRenderError } from './problems'
 import '@fontsource-variable/archivo/wdth.css'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/400-italic.css'
@@ -29,7 +29,10 @@ async function loadTerminalFonts(): Promise<void> {
 
 async function start(): Promise<void> {
   await loadTerminalFonts()
-  createRoot(document.getElementById('root')!).render(
+  createRoot(document.getElementById('root')!, {
+    onCaughtError: reportRenderError,
+    onUncaughtError: reportRenderError
+  }).render(
     <StrictMode>
       <ErrorBoundary>
         <App />
