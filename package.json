@@ -15,7 +15,8 @@
     "test:e2e": "npm run build && playwright test",
     "bugs": "node scripts/bugs.mjs",
     "package": "npm run build && electron-builder --mac --dir",
-    "install:app": "npm run package && node scripts/install-app.mjs"
+    "install:app": "npm run package && node scripts/install-app.mjs",
+    "install:when-closed": "node scripts/install-when-closed.mjs"
   },
   "dependencies": {
     "node-pty": "1.1.0"

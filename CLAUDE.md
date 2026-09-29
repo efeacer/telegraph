@@ -23,6 +23,7 @@ xterm.js, with sessions running in node-pty.
 | `npm run test:e2e` | Builds the app and runs the end-to-end tests |
 | `npm run bugs` | Prints the problems the app has recorded |
 | `npm run install:app` | Packages the app and copies it to /Applications |
+| `npm run install:when-closed` | Installs the packaged app once the user has closed Telegraph, and opens it again |
 
 The end-to-end tests open a window per test. The windows stay in the
 background and out of the Dock, because the user is often at work in the
@@ -31,7 +32,20 @@ Keep it that way, and say so before running them.
 
 `npm run install:app` refuses to run while Telegraph is open, because
 replacing the app ends every session in it. Claude often runs inside
-Telegraph, so ask before quitting it.
+Telegraph and cannot close the app it runs in. To get a new version to the
+user from there:
+
+1. Run `npm run package`, and try the packaged app with a temporary
+   `TELEGRAPH_USER_DATA`.
+2. Run `npm run install:when-closed`. It waits in the background, for up to a
+   day, until the user closes Telegraph. Then it replaces the app and opens
+   it again. `-- --cancel` stops the waiting.
+3. Tell the user that closing Telegraph ends the sessions in it, and that
+   chats with an agent are continued from the agent's own record of them:
+   "continue the last chat" in the project.
+
+The app that was replaced is kept in `dist/previous`, and what happened is
+written to `dist/install-when-closed.log`.
 
 ## Improving Telegraph from its bug log
 
