@@ -210,7 +210,7 @@ test('starts from the sidebar with the model that was chosen last', async () => 
     'Start Greeter',
     'Start Parrot',
     'Parrot, continue last chat',
-    'Choose a model…',
+    'Choose a model or a chat…',
     'Remove project'
   ])
   await page.getByRole('menuitem', { name: 'Parrot, continue last chat' }).click()
@@ -223,7 +223,7 @@ test('shows the choice again while sessions are open', async () => {
   await expect(page.locator('.session')).toHaveCount(1)
 
   await page.getByRole('button', { name: 'Start a session in signal-box' }).click()
-  await page.getByRole('menuitem', { name: 'Choose a model…' }).click()
+  await page.getByRole('menuitem', { name: 'Choose a model or a chat…' }).click()
   await expect(page.getByRole('heading', { name: 'Start a session in signal-box' })).toBeVisible()
   await expect(blank('Agent')).toHaveText('Shell')
 })
@@ -231,7 +231,7 @@ test('shows the choice again while sessions are open', async () => {
 test('goes back to the session when the choice is closed', async () => {
   await start(page, 'Shell')
   await page.getByRole('button', { name: 'Start a session in signal-box' }).click()
-  await page.getByRole('menuitem', { name: 'Choose a model…' }).click()
+  await page.getByRole('menuitem', { name: 'Choose a model or a chat…' }).click()
   await expect(blank('Agent')).toBeVisible()
 
   await app.evaluate(({ Menu }) => {

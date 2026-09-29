@@ -20,6 +20,7 @@ import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@sh
 import { Attachments } from './attachments'
 import { BugLog } from './buglog'
 import { ModelCatalogue } from './catalogue'
+import { listChats } from './chats'
 import { readGitStatus } from './git'
 import { findInstalled } from './installed'
 import { buildMenu } from './menu'
@@ -125,6 +126,19 @@ function registerIpc(
   listen(IPC.saveChoice, (projectId: string, choice: unknown) =>
     store.saveChoice(projectId, choice)
   )
+
+  handle(IPC.listChats, (projectId: unknown, launcherId: unknown) => {
+    // Found by what Telegraph knows of them: the window does not get to name a folder to read.
+    const { projects, launchers } = store.get()
+    const project = projects.find((candidate) => candidate.id === projectId)
+    const launcher = launchers.find((candidate) => candidate.id === launcherId)
+    if (!project || launcher?.chats?.kind !== 'claude') return []
+    return listChats({
+      // Claude Code keeps its records in the home folder unless it is told another place.
+      configDir: process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'), '.claude'),
+      projectPath: project.path
+    })
+  })
 
   handle(IPC.addProject, async () => {
     if (!window) return null

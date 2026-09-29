@@ -19,6 +19,7 @@ const api: TelegraphApi = {
   installedLaunchers: () => ipcRenderer.invoke(IPC.installedLaunchers),
   loadCatalogue: () => ipcRenderer.invoke(IPC.loadCatalogue),
   saveChoice: (projectId, choice) => ipcRenderer.send(IPC.saveChoice, projectId, choice),
+  listChats: (projectId, launcherId) => ipcRenderer.invoke(IPC.listChats, projectId, launcherId),
   gitStatus: (projectPath) => ipcRenderer.invoke(IPC.gitStatus, projectPath),
   createSession: (request) => ipcRenderer.invoke(IPC.createSession, request),
   closeSession: (sessionId) => ipcRenderer.invoke(IPC.closeSession, sessionId),

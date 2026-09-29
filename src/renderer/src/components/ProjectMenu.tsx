@@ -82,7 +82,7 @@ export function ProjectMenu({ project, launchers, hasSessions }: ProjectMenuProp
             className="menu-item"
             onClick={() => choose(() => showPicker(project.id))}
           >
-            Choose a model…
+            Choose a model or a chat…
           </button>
           <div className="menu-divider" role="separator" />
           <button

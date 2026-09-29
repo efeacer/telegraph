@@ -834,6 +834,11 @@ button:focus-visible {
   background: var(--wire-faint);
 }
 
+.blank-option-note {
+  font-size: var(--text-small);
+  color: var(--slate);
+}
+
 /* The name a program knows the model by, as it would be typed. */
 .blank-option-hint {
   font-family: 'IBM Plex Mono', monospace;

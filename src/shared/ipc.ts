@@ -5,6 +5,7 @@ export const IPC = {
   installedLaunchers: 'launchers:installed',
   loadCatalogue: 'models:load',
   saveChoice: 'choices:save',
+  listChats: 'chats:list',
   saveAttachment: 'attachments:save',
   gitStatus: 'git:status',
   createSession: 'session:create',

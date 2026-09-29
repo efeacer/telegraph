@@ -5,6 +5,10 @@ export interface Option {
   label: string
   /** Said after the label in smaller letters, such as the name a program knows a model by. */
   hint?: string
+  /** Said after the label as well, in the letters of the label: when a chat last went on. */
+  note?: string
+  /** What else the option is found by when its name is typed, such as a title inside its label. */
+  alias?: string
   /** Options of the same group stand together, with a line before the next group. */
   group?: string
 }
@@ -62,7 +66,9 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
   const seek = (character: string, at: number): void => {
     const text = isTyping(at) ? typed.current.text + character : character
     typed.current = { text, at }
-    const found = options.findIndex((option) => option.label.toLowerCase().startsWith(text))
+    const found = options.findIndex(({ label, alias }) =>
+      [label, alias ?? ''].some((name) => name !== '' && name.toLowerCase().startsWith(text))
+    )
     if (found === -1) return
     if (open) moveTo(found)
     else onChange(options[found]!.value)
@@ -159,13 +165,14 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
               aria-selected={index === selected}
               // Named by its label alone, with the hint as what is said about it.
               aria-label={option.label}
-              aria-description={option.hint}
+              aria-description={option.hint ?? option.note}
               className={classNames(option, options[index - 1], index === active)}
               onMouseEnter={() => setActiveValue(option.value)}
               onClick={() => choose(index)}
             >
               <span className="blank-option-label">{option.label}</span>
               {option.hint && <span className="blank-option-hint">{option.hint}</span>}
+              {option.note && <span className="blank-option-note">{option.note}</span>}
             </li>
           ))}
         </ul>

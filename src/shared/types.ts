@@ -115,6 +115,8 @@ export interface TelegraphApi {
   /** The models of each provider. Empty when the list could not be had. */
   loadCatalogue(): Promise<Catalogue>
   saveChoice(projectId: string, choice: Choice): void
+  /** The chats a launcher has had in a project, the latest first. None if it keeps none. */
+  listChats(projectId: string, launcherId: string): Promise<Chat[]>
   gitStatus(projectPath: string): Promise<GitStatus | null>
   createSession(request: CreateSessionRequest): Promise<CreateSessionResult>
   /** Resolves to false when the user chose to keep the session running. */

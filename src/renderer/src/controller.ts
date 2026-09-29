@@ -2,7 +2,7 @@ import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
 import { escapePath } from '@shared/paths'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
-import type { Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
+import type { Chat, Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
 import { getState, orderedSessions, setState, type SessionView } from './store'
 import { TerminalManager } from './terminals'
@@ -102,6 +102,15 @@ export async function removeProject(projectId: string): Promise<void> {
   })
 }
 
+/** The chats a launcher has had in a project. None if they cannot be told. */
+export async function listChats(projectId: string, launcherId: string): Promise<Chat[]> {
+  try {
+    return await api.listChats(projectId, launcherId)
+  } catch {
+    return []
+  }
+}
+
 /** Shows the choice of what to start, also while the project has sessions open. */
 export function showPicker(projectId: string): void {
   setState((state) => ({ ...state, selectedProjectId: projectId, activeSessionId: null }))
@@ -175,7 +184,11 @@ export async function startSession(
   const result = await api.createSession({
     sessionId,
     cwd: project.path,
-    command: composeCommand(launcher, { model: modelId, modeId: start.modeId ?? null }),
+    command: composeCommand(launcher, {
+      model: modelId,
+      modeId: start.modeId ?? null,
+      chatId: start.chatId ?? null
+    }),
     cols: size.cols,
     rows: size.rows
   })

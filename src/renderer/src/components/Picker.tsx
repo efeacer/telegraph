@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { SHELL_LAUNCHER_ID } from '@shared/launchers'
 import { modelsFor } from '@shared/models'
-import type { Catalogue, Choice, Launcher, Project } from '@shared/types'
-import { startSession } from '../controller'
+import type { Catalogue, Chat, Choice, Launcher, Project } from '@shared/types'
+import { listChats, startSession } from '../controller'
+import { describeAge } from '../format'
 import { Select, type Option } from './Select'
 
 // Values no model and no mode can have.
 const USUAL = ''
 const ANOTHER = '\u0000another'
 const NEW_CHAT = ''
+// What is chosen in the blank for the chat is a mode or a chat that was had before.
+const MODE = 'mode:'
+const CHAT = 'chat:'
 
 interface PickerProps {
   project: Project
@@ -22,7 +26,8 @@ interface PickerProps {
 export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
   const [launcherId, setLauncherId] = useState(() => firstChoice(launchers, choice))
   const [model, setModel] = useState(() => choice?.models[launcherId] ?? USUAL)
-  const [modeId, setModeId] = useState(NEW_CHAT)
+  const [chat, setChat] = useState(NEW_CHAT)
+  const [chats, setChats] = useState<Chat[]>([])
   const [typing, setTyping] = useState(false)
   const modelBlank = useRef<HTMLButtonElement>(null)
   const returning = useRef(false)
@@ -35,6 +40,21 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
   }, [typing])
 
   const launcher = launchers.find((candidate) => candidate.id === launcherId) ?? launchers[0]
+  const keepsChats = launcher?.chats !== undefined
+
+  // Asked for each time the choice is shown, since chats are had in between.
+  useEffect(() => {
+    setChats([])
+    if (!launcher || !keepsChats) return
+    let shown = true
+    void listChats(project.id, launcher.id).then((found) => {
+      if (shown) setChats(found)
+    })
+    return () => {
+      shown = false
+    }
+  }, [project.id, launcher?.id, keepsChats])
+
   if (!launcher) return null
 
   const models = modelsFor(launcher, catalogue)
@@ -44,7 +64,7 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
   const chooseLauncher = (id: string): void => {
     setLauncherId(id)
     setModel(choice?.models[id] ?? USUAL)
-    setModeId(NEW_CHAT)
+    setChat(NEW_CHAT)
     setTyping(false)
   }
 
@@ -68,7 +88,8 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
     event.preventDefault()
     void startSession(project.id, launcher.id, {
       model: takesModel && model.trim() !== '' ? model.trim() : null,
-      modeId: modeId === NEW_CHAT ? null : modeId
+      modeId: chat.startsWith(MODE) ? chat.slice(MODE.length) : null,
+      chatId: chat.startsWith(CHAT) ? chat.slice(CHAT.length) : null
     })
   }
 
@@ -141,17 +162,24 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
             )}
           </>
         )}
-        {modes.length > 0 && (
+        {(modes.length > 0 || chats.length > 0) && (
           <>
             <span className="picker-word">to</span>
             <Select
               label="Chat"
-              value={modeId}
+              value={chat}
               options={[
-                { value: NEW_CHAT, label: 'start a new chat' },
-                ...modes.map(({ id, name }) => ({ value: id, label: name }))
+                { value: NEW_CHAT, label: 'start a new chat', group: 'new' },
+                ...modes.map(({ id, name }) => ({ value: `${MODE}${id}`, label: name, group: 'modes' })),
+                ...chats.map(({ id, title, at }) => ({
+                  value: `${CHAT}${id}`,
+                  label: `reopen “${title}”`,
+                  alias: title,
+                  note: describeAge(at),
+                  group: 'chats'
+                }))
               ]}
-              onChange={setModeId}
+              onChange={setChat}
             />
           </>
         )}

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
@@ -32,7 +32,8 @@ export function createWorkspace(): Workspace {
           modelFlag: '--model',
           providers: ['aviary'],
           models: [{ id: 'swift', name: 'Swift, latest' }],
-          modes: [{ id: 'continue', name: 'continue last chat', args: '--continue' }]
+          modes: [{ id: 'continue', name: 'continue last chat', args: '--continue' }],
+          chats: { kind: 'claude', flag: '--resume' }
         },
         { id: 'missing', name: 'Missing', command: 'telegraph-no-such-program --flag' }
       ]
@@ -52,6 +53,30 @@ export function createWorkspace(): Workspace {
     })
   )
   return { root, projectPath, userData }
+}
+
+/** Where the tests keep chats, in place of the user's own. */
+export function configDirOf(workspace: Workspace): string {
+  return join(workspace.root, 'claude-config')
+}
+
+/** Writes the record of a chat the way Claude Code does. */
+export function recordChat(
+  workspace: Workspace,
+  chat: { id: string; title: string; minutesAgo: number; folder?: string }
+): void {
+  const folder = chat.folder ?? workspace.projectPath
+  const records = join(configDirOf(workspace), 'projects', folder.replace(/[^A-Za-z0-9]/g, '-'))
+  mkdirSync(records, { recursive: true })
+  const path = join(records, `${chat.id}.jsonl`)
+  const lines = [
+    { type: 'mode', mode: 'default' },
+    { type: 'user', cwd: folder, entrypoint: 'cli', message: { role: 'user', content: 'hello' } },
+    { type: 'ai-title', aiTitle: chat.title }
+  ]
+  writeFileSync(path, lines.map((line) => JSON.stringify(line)).join('\n'))
+  const at = new Date(Date.now() - chat.minutesAgo * 60_000)
+  utimesSync(path, at, at)
 }
 
 export function removeWorkspace(workspace: Workspace): void {
@@ -78,6 +103,7 @@ export async function launch(
       ...process.env,
       TELEGRAPH_E2E: '1',
       TELEGRAPH_USER_DATA: workspace.userData,
+      CLAUDE_CONFIG_DIR: configDirOf(workspace),
       // A plain shell keeps the tests independent of the user's own setup.
       SHELL: '/bin/sh'
     }

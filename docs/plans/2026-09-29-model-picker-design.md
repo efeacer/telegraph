@@ -114,7 +114,7 @@ Claude ▾  on  Latest Opus ▾  to  continue the last chat ▾
 
 Each blank opens a list. The blanks for the model and the mode are only there
 when the launcher has something to choose from. The project's menu in the
-sidebar gains "Choose a model…", which shows this sentence while sessions are
+sidebar gains "Choose a model or a chat…", which shows this sentence while sessions are
 open.
 
 The lists are a listbox with a button, which the keyboard can open, move in

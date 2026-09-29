@@ -43,6 +43,12 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Going on with a chat
+
+The chats Claude has had in a project are offered where a session is started,
+by what they are called and when they last went on. Choosing one opens it
+again in full, in a session under the project.
+
 ## Attaching files
 
 Drop a file on a session, or paste one, and Telegraph types its path for the
