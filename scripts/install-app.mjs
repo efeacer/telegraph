@@ -31,7 +31,9 @@ console.log(`Installed ${destination}`)
 
 function isRunning() {
   try {
-    execFileSync('pgrep', ['-f', `${destination}/Contents/MacOS/`], { stdio: 'ignore' })
+    // With the processes this one descends from: started in a session of
+    // Telegraph, this script is one of them, and would not see it otherwise.
+    execFileSync('pgrep', ['-a', '-f', `${destination}/Contents/MacOS/`], { stdio: 'ignore' })
     return true
   } catch {
     return false
