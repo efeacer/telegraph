@@ -70,9 +70,15 @@ async function readTitle(path: string, projectPath: string): Promise<string | nu
     if (hadElsewhere && hadElsewhere.cwd !== projectPath) return null
     if (head.some((line) => line.type === 'user' && line.isSidechain === true)) return null
 
-    const given = [...head, ...tail].findLast((line) => line.type === 'ai-title')?.aiTitle
-    const title = tidy(given) ?? head.map(saidBy).find((text) => text !== null)
-    return title ?? null
+    const given = tidy([...head, ...tail].findLast((line) => line.type === 'ai-title')?.aiTitle)
+
+    // Programs have chats too, to make summaries and the like, which nobody wants to go on with.
+    // Records say where a chat was started. Those from before they did have a title if a person was in it.
+    const startedFrom = head.find((line) => line.type === 'user' && line.isMeta !== true)?.entrypoint
+    const byPerson = startedFrom === 'cli' || (startedFrom === undefined && given !== undefined)
+    if (!byPerson) return null
+
+    return given ?? head.map(saidBy).find((text) => text !== null) ?? null
   } finally {
     await file.close()
   }

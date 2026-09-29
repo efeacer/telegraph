@@ -23,7 +23,14 @@ afterEach(() => {
 })
 
 function said(text: unknown, more: Record<string, unknown> = {}): Record<string, unknown> {
-  return { type: 'user', cwd: PROJECT, isSidechain: false, message: { role: 'user', content: text }, ...more }
+  return {
+    type: 'user',
+    cwd: PROJECT,
+    entrypoint: 'cli',
+    isSidechain: false,
+    message: { role: 'user', content: text },
+    ...more
+  }
 }
 
 function answered(text: string): Record<string, unknown> {
@@ -109,6 +116,17 @@ describe('listChats', () => {
     record(FIRST, [said('to a helper')], undefined, 'agent-a070a43.jsonl')
     record(SECOND, [said('on the side', { isSidechain: true })])
     expect(await list()).toEqual([])
+  })
+
+  it('leaves out what a program asked for and no person', async () => {
+    record(FIRST, [said('Summarize this conversation', { entrypoint: 'sdk-cli' })])
+    record(SECOND, [{ type: 'queue-operation' }, said('Summarize that one', { entrypoint: undefined })])
+    expect(await list()).toEqual([])
+  })
+
+  it('keeps a chat from before records said where they were started', async () => {
+    record(FIRST, [said('an old chat', { entrypoint: undefined }), titled('An old chat')])
+    expect((await list()).map((chat) => chat.title)).toEqual(['An old chat'])
   })
 
   it('leaves out what is not the record of a chat', async () => {
