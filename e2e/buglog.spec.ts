@@ -2,7 +2,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import type { LogEntry } from '../src/shared/buglog'
-import { createWorkspace, launch, removeWorkspace, type Workspace } from './telegraph'
+import { createWorkspace, launch, removeWorkspace, start, type Workspace } from './telegraph'
 
 let workspace: Workspace
 let app: ElectronApplication
@@ -11,7 +11,7 @@ let page: Page
 test.beforeEach(async () => {
   workspace = createWorkspace()
   ;({ app, page } = await launch(workspace))
-  await expect(page.getByRole('button', { name: 'Start Shell' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start Greeter' })).toBeVisible()
 })
 
 test.afterEach(async () => {
@@ -40,7 +40,7 @@ async function chooseFromMenu(id: string): Promise<void> {
 }
 
 test('records nothing while all is well', async () => {
-  await page.getByRole('button', { name: 'Start Shell' }).click()
+  await start(page, 'Shell')
   await expect(page.locator('.session')).toHaveCount(1)
   await app.close()
   expect(logged()).toEqual([])
@@ -90,13 +90,13 @@ test('records an error thrown in the main process', async () => {
   expect(entry.message).toBe('Error: thrown in the main process')
   await expect(page.getByRole('alert')).toContainText('Telegraph ran into a problem')
   // The app carries on, because ending it would end every session in it.
-  await page.getByRole('button', { name: 'Start Shell' }).click()
+  await start(page, 'Shell')
   await expect(page.locator('.session')).toHaveCount(1)
 })
 
 test('records a session that could not start', async () => {
   rmSync(workspace.projectPath, { recursive: true })
-  await page.getByRole('button', { name: 'Start Shell' }).click()
+  await start(page, 'Shell')
   await expect(page.getByRole('alert')).toContainText('Could not start Shell in signal-box')
 
   const entry = await entryOfKind('session-failure')
@@ -118,7 +118,7 @@ test('records a run that was killed', async () => {
   await app.waitForEvent('close')
 
   ;({ app, page } = await launch(workspace))
-  await expect(page.getByRole('button', { name: 'Start Shell' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start Greeter' })).toBeVisible()
 
   const entry = await entryOfKind('unclean-exit')
   expect(entry.message).toBe('The previous run ended without shutting down')
@@ -127,7 +127,7 @@ test('records a run that was killed', async () => {
 })
 
 test('keeps what is in the terminals out of the log', async () => {
-  await page.getByRole('button', { name: 'Start Shell' }).click()
+  await start(page, 'Shell')
   await page.locator('.terminal-view.is-active .xterm-helper-textarea').focus()
   await page.keyboard.type('printf "\\033]0;secret-title\\007"; echo "secret-$((40 + 2))-output"')
   await page.keyboard.press('Enter')
@@ -152,7 +152,7 @@ test('keeps what is in the terminals out of the log', async () => {
 })
 
 test('saves a note about a bug', async () => {
-  await page.getByRole('button', { name: 'Start Shell' }).click()
+  await start(page, 'Shell')
   await expect(page.locator('.session')).toHaveCount(1)
 
   await chooseFromMenu('report-bug')
@@ -168,7 +168,7 @@ test('saves a note about a bug', async () => {
   expect(entry.message).toBe('The wire flickers when a session ends')
   expect(entry.detail).toEqual({
     projects: 1,
-    sessions: [{ launcher: 'Shell', status: expect.any(String), active: true }]
+    sessions: [{ launcher: 'Shell', model: null, status: expect.any(String), active: true }]
   })
   await expect(page.locator('.terminal-view.is-active .xterm-helper-textarea')).toBeFocused()
 })

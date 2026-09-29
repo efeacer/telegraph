@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Launcher, Project } from '@shared/types'
-import { removeProject, startSession } from '../controller'
+import { removeProject, showPicker, startSession } from '../controller'
 
 interface ProjectMenuProps {
   project: Project
@@ -51,7 +51,7 @@ export function ProjectMenu({ project, launchers, hasSessions }: ProjectMenuProp
       </button>
       {open && (
         <div className="menu" id={menuId} role="menu" aria-label={`Sessions in ${project.name}`}>
-          {launchers.map((launcher) => (
+          {launchers.flatMap((launcher) => [
             <button
               key={launcher.id}
               type="button"
@@ -60,8 +60,30 @@ export function ProjectMenu({ project, launchers, hasSessions }: ProjectMenuProp
               onClick={() => choose(() => void startSession(project.id, launcher.id))}
             >
               Start {launcher.name}
-            </button>
-          ))}
+            </button>,
+            ...(launcher.modes ?? []).map((mode) => (
+              <button
+                key={`${launcher.id} ${mode.id}`}
+                type="button"
+                role="menuitem"
+                className="menu-item"
+                onClick={() =>
+                  choose(() => void startSession(project.id, launcher.id, { modeId: mode.id }))
+                }
+              >
+                {launcher.name}, {mode.name}
+              </button>
+            ))
+          ])}
+          <div className="menu-divider" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-item"
+            onClick={() => choose(() => showPicker(project.id))}
+          >
+            Choose a model…
+          </button>
           <div className="menu-divider" role="separator" />
           <button
             type="button"

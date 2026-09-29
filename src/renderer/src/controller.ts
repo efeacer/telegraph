@@ -1,5 +1,7 @@
+import { composeCommand } from '@shared/launchers'
+import { isModelId, modelsFor } from '@shared/models'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
-import type { MenuCommand } from '@shared/types'
+import type { Choice, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
 import { getState, orderedSessions, setState, type SessionView } from './store'
 import { TerminalManager } from './terminals'
@@ -17,14 +19,17 @@ export function attachTerminalHost(host: HTMLElement): void {
 }
 
 export async function initialize(): Promise<void> {
-  const persisted = await api.loadState()
+  const [persisted, installed] = await Promise.all([api.loadState(), api.installedLaunchers()])
   setState((state) => ({
     ...state,
     loaded: true,
     projects: persisted.projects,
-    launchers: persisted.launchers,
+    launchers: persisted.launchers.filter((launcher) => installed.includes(launcher.id)),
+    choices: persisted.choices,
     selectedProjectId: persisted.projects[0]?.id ?? null
   }))
+  // The list may have to come from the network, which nothing else waits for.
+  void api.loadCatalogue().then((catalogue) => setState((state) => ({ ...state, catalogue })))
 
   api.onSessionData((sessionId, data) => {
     terminals.write(sessionId, data)
@@ -71,8 +76,15 @@ export async function removeProject(projectId: string): Promise<void> {
     const projects = state.projects.filter((project) => project.id !== projectId)
     const selectedProjectId =
       state.selectedProjectId === projectId ? (projects[0]?.id ?? null) : state.selectedProjectId
-    return { ...state, projects, selectedProjectId }
+    const { [projectId]: _removed, ...choices } = state.choices
+    return { ...state, projects, choices, selectedProjectId }
   })
+}
+
+/** Shows the choice of what to start, also while the project has sessions open. */
+export function showPicker(projectId: string): void {
+  setState((state) => ({ ...state, selectedProjectId: projectId, activeSessionId: null }))
+  terminals.show(null)
 }
 
 export function selectProject(projectId: string): void {
@@ -87,11 +99,31 @@ export function selectProject(projectId: string): void {
   terminals.show(null)
 }
 
-export async function startSession(projectId: string, launcherId: string): Promise<void> {
+/**
+ * Starts a launcher in a project. What is left out of the start is filled in:
+ * the model with the one last chosen for the launcher, the mode with a new chat.
+ */
+export async function startSession(
+  projectId: string,
+  launcherId: string,
+  start: Partial<Start> = {}
+): Promise<void> {
   const current = getState()
   const project = current.projects.find((candidate) => candidate.id === projectId)
   const launcher = current.launchers.find((candidate) => candidate.id === launcherId)
   if (!project || !launcher) return
+
+  const remembered = current.choices[projectId]?.models[launcherId] ?? null
+  const chosen = (start.model === undefined ? remembered : start.model)?.trim() || null
+  const modelId = launcher.command !== null && launcher.modelFlag ? chosen : null
+  const model: Model | null =
+    modelId === null
+      ? null
+      : (modelsFor(launcher, current.catalogue).find((known) => known.id === modelId) ?? {
+          id: modelId,
+          name: modelId
+        })
+  remember(projectId, launcherId, modelId)
 
   const sessionId = crypto.randomUUID()
   const size = terminals.create(sessionId, {
@@ -110,6 +142,7 @@ export async function startSession(projectId: string, launcherId: string): Promi
     id: sessionId,
     projectId,
     launcherName: launcher.name,
+    model,
     title: null,
     status: 'idle'
   }
@@ -119,7 +152,7 @@ export async function startSession(projectId: string, launcherId: string): Promi
   const result = await api.createSession({
     sessionId,
     cwd: project.path,
-    command: launcher.command,
+    command: composeCommand(launcher, { model: modelId, modeId: start.modeId ?? null }),
     cols: size.cols,
     rows: size.rows
   })
@@ -130,6 +163,15 @@ export async function startSession(projectId: string, launcherId: string): Promi
       error: `Could not start ${launcher.name} in ${project.name}. ${result.error}.`
     }))
   }
+}
+
+function remember(projectId: string, launcherId: string, modelId: string | null): void {
+  const { [launcherId]: _before, ...models } = getState().choices[projectId]?.models ?? {}
+  // The state file keeps no name that could not be a model's, so neither does the window.
+  if (modelId !== null && isModelId(modelId)) models[launcherId] = modelId
+  const choice: Choice = { launcherId, models }
+  setState((state) => ({ ...state, choices: { ...state.choices, [projectId]: choice } }))
+  api.saveChoice(projectId, choice)
 }
 
 export function activateSession(sessionId: string): void {
@@ -181,6 +223,7 @@ export function saveBugReport(note: string): Promise<boolean> {
       projects: projects.length,
       sessions: sessions.map((session) => ({
         launcher: session.launcherName,
+        model: session.model?.id ?? null,
         status: session.status,
         active: session.id === activeSessionId
       }))

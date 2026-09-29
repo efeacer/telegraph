@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from 'react'
 import type { SessionStatus } from '@shared/status'
-import type { GitStatus, Launcher, Project } from '@shared/types'
+import type { Catalogue, Choice, GitStatus, Launcher, Model, Project } from '@shared/types'
 
 export interface SessionView {
   id: string
   projectId: string
   launcherName: string
+  /** The model the session was started on, unless the program chose it. */
+  model: Model | null
   /** Title the running program has set for its terminal, if any. */
   title: string | null
   status: SessionStatus
@@ -14,7 +16,11 @@ export interface SessionView {
 export interface AppState {
   loaded: boolean
   projects: Project[]
+  /** The launchers whose program is installed. */
   launchers: Launcher[]
+  catalogue: Catalogue
+  /** What was last chosen in each project. */
+  choices: Record<string, Choice>
   git: Record<string, GitStatus | null>
   sessions: SessionView[]
   activeSessionId: string | null
@@ -27,6 +33,8 @@ let state: AppState = {
   loaded: false,
   projects: [],
   launchers: [],
+  catalogue: {},
+  choices: {},
   git: {},
   sessions: [],
   activeSessionId: null,

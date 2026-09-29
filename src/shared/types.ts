@@ -91,6 +91,11 @@ export interface TelegraphApi {
   loadState(): Promise<PersistedState>
   addProject(): Promise<Project | null>
   removeProject(projectId: string): Promise<void>
+  /** The ids of the launchers whose program is installed. */
+  installedLaunchers(): Promise<string[]>
+  /** The models of each provider. Empty when the list could not be had. */
+  loadCatalogue(): Promise<Catalogue>
+  saveChoice(projectId: string, choice: Choice): void
   gitStatus(projectPath: string): Promise<GitStatus | null>
   createSession(request: CreateSessionRequest): Promise<CreateSessionResult>
   /** Resolves to false when the user chose to keep the session running. */

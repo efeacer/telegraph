@@ -9,6 +9,7 @@ import {
   crashReporter,
   dialog,
   ipcMain,
+  net,
   shell,
   type IpcMainEvent,
   type IpcMainInvokeEvent
@@ -17,9 +18,12 @@ import { checkWindowReport, describeProblem, type LogEntry } from '@shared/buglo
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
 import { BugLog } from './buglog'
+import { ModelCatalogue } from './catalogue'
 import { readGitStatus } from './git'
+import { findInstalled } from './installed'
 import { buildMenu } from './menu'
 import { PtyManager } from './pty'
+import { buildSessionEnv } from './shell'
 import { StateStore } from './store'
 import { watchProcess, watchWindow } from './watch'
 
@@ -97,8 +101,20 @@ function listen<Args extends unknown[]>(channel: string, handler: (...args: Args
   })
 }
 
-function registerIpc(store: StateStore): void {
+function registerIpc(
+  store: StateStore,
+  installed: Promise<string[]>,
+  catalogue: ModelCatalogue
+): void {
   handle(IPC.loadState, () => store.get())
+
+  handle(IPC.installedLaunchers, () => installed)
+
+  handle(IPC.loadCatalogue, () => catalogue.load())
+
+  listen(IPC.saveChoice, (projectId: string, choice: unknown) =>
+    store.saveChoice(projectId, choice)
+  )
 
   handle(IPC.addProject, async () => {
     if (!window) return null
@@ -311,15 +327,31 @@ if (!app.requestSingleInstanceLock()) {
     const store = new StateStore(join(app.getPath('userData'), 'state.json'), (error, backupPath) =>
       bugLog.record({ kind: 'state-unreadable', ...describeProblem(error), detail: { backupPath } })
     )
-    registerIpc(store)
-    Menu.setApplicationMenu(
-      buildMenu({
-        launchers: store.get().launchers,
-        includeDeveloperTools: !app.isPackaged,
-        send: sendMenuCommand,
-        showBugLog
-      })
+    const { launchers } = store.get()
+    const installed = findInstalled(
+      launchers,
+      process.env.SHELL,
+      buildSessionEnv(process.env, app.getVersion())
     )
+    const catalogue = new ModelCatalogue({
+      filePath: join(app.getPath('userData'), 'models.json'),
+      providers: [...new Set(launchers.flatMap((launcher) => launcher.providers ?? []))],
+      // The tests bring their own list, and never use the network.
+      fetch: isE2E ? null : (url, options) => net.fetch(url, options)
+    })
+    registerIpc(store, installed, catalogue)
+
+    const setMenu = (offered: typeof launchers): void =>
+      Menu.setApplicationMenu(
+        buildMenu({
+          launchers: offered,
+          includeDeveloperTools: !app.isPackaged,
+          send: sendMenuCommand,
+          showBugLog
+        })
+      )
+    setMenu(launchers)
+    void installed.then((ids) => setMenu(launchers.filter((launcher) => ids.includes(launcher.id))))
     createWindow()
   })
 }
