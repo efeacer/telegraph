@@ -27,10 +27,11 @@ const { values, positionals } = parseArgs({
   }
 })
 
+const folders = values.dir ?? APP_FOLDERS.map((name) => join(appData(), name, 'logs'))
+
 if (values.resolve !== undefined) {
   markResolved(values.resolve, positionals.join(' ').trim())
 } else {
-  const folders = values.dir ?? APP_FOLDERS.map((name) => join(appData(), name, 'logs'))
   const groups = digest(folders.flatMap(readFolder), { resolved: readResolved(), all: values.all })
   process.stdout.write(values.json ? `${JSON.stringify(groups, null, 2)}\n` : render(groups, { folders }))
 }
@@ -49,12 +50,24 @@ function readFolder(folder) {
 
 function readResolved() {
   if (!existsSync(RESOLVED_FILE)) return []
-  return JSON.parse(readFileSync(RESOLVED_FILE, 'utf8'))
+  try {
+    const resolved = JSON.parse(readFileSync(RESOLVED_FILE, 'utf8'))
+    if (Array.isArray(resolved)) return resolved
+  } catch {
+    // Reported below.
+  }
+  console.error(`${RESOLVED_FILE} is not a list of resolved problems. Repair it, or delete it to start over.`)
+  process.exit(1)
 }
 
 function markResolved(fingerprint, note) {
   if (!/^[0-9a-f]{8}$/.test(fingerprint) || note === '') {
     console.error('Usage: npm run bugs -- --resolve <fingerprint> "what fixed it"')
+    process.exit(1)
+  }
+  const known = folders.flatMap(readFolder).some((entry) => entry.fingerprint === fingerprint)
+  if (!known) {
+    console.error(`No problem in the bug log has the fingerprint ${fingerprint}.`)
     process.exit(1)
   }
   const resolved = resolve(readResolved(), fingerprint, note, new Date())

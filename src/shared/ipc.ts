@@ -12,7 +12,8 @@ export const IPC = {
   openExternal: 'shell:open-external',
   menuCommand: 'menu:command',
   report: 'log:report',
-  reporting: 'log:reporting'
+  reporting: 'log:reporting',
+  problem: 'log:problem'
 } as const
 
 export const E2E_ARGUMENT = '--telegraph-e2e'

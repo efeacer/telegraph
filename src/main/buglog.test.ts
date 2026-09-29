@@ -108,6 +108,46 @@ describe('BugLog', () => {
     expect(log.record({ kind: 'main-error', message: 'flood' })).toBeNull()
   })
 
+  it('writes every note about a bug, however often it is made', () => {
+    const log = openLog()
+    const saved = Array.from({ length: 12 }, () =>
+      log.record({ kind: 'bug-report', message: 'it froze again' })
+    )
+    expect(saved.every((entry) => entry !== null)).toBe(true)
+    expect(entries().map((entry) => entry.count)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+  })
+
+  it('stops writing when problems of every kind pour in', () => {
+    let time = Date.parse('2026-09-29T12:00:00.000Z')
+    const log = openLog({ now: () => new Date(time), maxPerMinute: 5 })
+
+    for (let index = 0; index < 8; index++) {
+      log.record({ kind: 'console-error', message: `word${'s'.repeat(index)} differ` })
+      time += 1_000
+    }
+    expect(entries()).toHaveLength(5)
+
+    time += 60_000
+    expect(log.record({ kind: 'console-error', message: 'a minute later' })).not.toBeNull()
+  })
+
+  it('writes a note about a bug while problems pour in', () => {
+    const log = openLog({ maxPerMinute: 1 })
+    log.record({ kind: 'console-error', message: 'one' })
+    log.record({ kind: 'console-error', message: 'two' })
+    expect(log.record({ kind: 'bug-report', message: 'errors are pouring in' })).not.toBeNull()
+  })
+
+  it('starts on a new line after an entry that was cut short', () => {
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'bugs.jsonl'), '{"at":"2026-09-29T11:0')
+    openLog().record({ kind: 'main-error', message: 'after the crash' })
+
+    const lines = readFileSync(join(directory, 'bugs.jsonl'), 'utf8').split('\n')
+    expect(lines).toHaveLength(3)
+    expect(JSON.parse(lines[1]!)).toMatchObject({ message: 'after the crash' })
+  })
+
   it('counts each problem on its own', () => {
     const log = openLog()
     for (let index = 0; index < 5; index++) log.record({ kind: 'main-error', message: 'flood' })
@@ -191,6 +231,18 @@ describe('fingerprintOf', () => {
     expect(other).toBe(one)
   })
 
+  it('is the same whatever the short id in the message', () => {
+    const one = fingerprintOf({ kind: 'main-error', message: 'No such object a3f9c2e1' })
+    const other = fingerprintOf({ kind: 'main-error', message: 'No such object 07bd44f0c2' })
+    expect(other).toBe(one)
+  })
+
+  it('tells apart notes that differ only in a number', () => {
+    const one = fingerprintOf({ kind: 'bug-report', message: 'Session 2 flickers' })
+    const other = fingerprintOf({ kind: 'bug-report', message: 'Session 3 flickers' })
+    expect(other).not.toBe(one)
+  })
+
   it('tells apart problems with different messages', () => {
     const one = fingerprintOf({ kind: 'main-error', message: 'one thing' })
     const other = fingerprintOf({ kind: 'main-error', message: 'another thing' })
@@ -233,14 +285,16 @@ describe('the running marker', () => {
       kind: 'unclean-exit',
       run: 'run-2',
       message: 'The previous run ended without shutting down',
-      detail: {
-        run: 'run-1',
-        startedAt: '2026-09-29T08:00:00.000Z',
-        version: '0.1.0',
-        builtAt: BUILD.builtAt
-      }
+      detail: { run: 'run-1', startedAt: '2026-09-29T08:00:00.000Z' }
     })
     expect(entries()).toEqual([entry])
+  })
+
+  it('blames the build that ended, not the one that found out', () => {
+    const newer: BuildInfo = { ...BUILD, version: '0.2.0', builtAt: '2026-09-30T10:00:00.000Z' }
+    openLog({ run: 'run-1' }).start()
+
+    expect(openLog({ run: 'run-2', build: newer }).start()?.build).toEqual(BUILD)
   })
 
   it('names the crash dumps written during that run', () => {
@@ -282,6 +336,10 @@ describe('the running marker', () => {
     openLog().start()
     writeFileSync(join(directory, 'running.json'), '{ not json')
 
-    expect(openLog({ run: 'run-2' }).start()).toMatchObject({ kind: 'unclean-exit', detail: {} })
+    expect(openLog({ run: 'run-2' }).start()).toMatchObject({
+      kind: 'unclean-exit',
+      detail: {},
+      build: BUILD
+    })
   })
 })

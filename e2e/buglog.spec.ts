@@ -88,6 +88,7 @@ test('records an error thrown in the main process', async () => {
 
   const entry = await entryOfKind('main-error')
   expect(entry.message).toBe('Error: thrown in the main process')
+  await expect(page.getByRole('alert')).toContainText('Telegraph ran into a problem')
   // The app carries on, because ending it would end every session in it.
   await page.getByRole('button', { name: 'Start Shell' }).click()
   await expect(page.locator('.session')).toHaveCount(1)
@@ -121,7 +122,33 @@ test('records a run that was killed', async () => {
 
   const entry = await entryOfKind('unclean-exit')
   expect(entry.message).toBe('The previous run ended without shutting down')
-  expect(entry.detail).toMatchObject({ version: '0.1.0' })
+  expect(entry.build.version).toBe('0.1.0')
+  expect(entry.detail).toMatchObject({ run: expect.any(String), startedAt: expect.any(String) })
+})
+
+test('keeps what is in the terminals out of the log', async () => {
+  await page.getByRole('button', { name: 'Start Shell' }).click()
+  await page.locator('.terminal-view.is-active .xterm-helper-textarea').focus()
+  await page.keyboard.type('printf "\\033]0;secret-title\\007"; echo "secret-$((40 + 2))-output"')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.terminal-view.is-active .xterm-rows')).toContainText('secret-42-output')
+  await expect(page.locator('.session-title')).toHaveText('secret-title')
+
+  await page.evaluate(() => console.error('could not draw "secret-glyph"'))
+  await page.evaluate(() => {
+    setTimeout(() => {
+      throw new Error('thrown beside a session')
+    })
+  })
+  await chooseFromMenu('report-bug')
+  const dialog = page.getByRole('dialog', { name: 'Report a bug' })
+  await dialog.getByLabel('What went wrong?').fill('A note made beside a session')
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await entryOfKind('bug-report')
+  await entryOfKind('window-error')
+  await entryOfKind('console-error')
+
+  expect(JSON.stringify(logged())).not.toContain('secret')
 })
 
 test('saves a note about a bug', async () => {

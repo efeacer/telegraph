@@ -31,17 +31,24 @@ when there is one, a few facts about the situation, and the build it came from
 (version, build time, packaged or not, Electron version, platform).
 
 Entries never hold anything read from or typed into a terminal, nor the
-titles programs give their sessions. The log never leaves the machine.
+titles programs give their sessions. What the window's console quotes is left
+out, because a library that fails on a character from a terminal will name
+that character. The log never leaves the machine.
 
 ## Keeping the log readable
 
 - **Fingerprints.** Each entry carries a fingerprint made from its kind, its
   message and the function names at the top of its stack. Numbers, ids and
   paths are left out, so the same bug has the same fingerprint across runs
-  and builds.
+  and builds. A note from the user is taken at its word: two notes are the
+  same problem only if they say the same.
 - **Repeats.** A bug in a timer could write thousands of entries. Within one
   run, a fingerprint is written the first three times and then on every tenth
   power (10, 100, 1000), each with its count so far.
+- **Floods.** At most 60 entries are written in a minute, whatever they say,
+  because writing holds up the main process and with it every session.
+- **Notes.** Neither limit applies to a note from the user, which is always
+  written.
 - **Size.** When `bugs.jsonl` passes 512 KB it becomes `bugs.1.jsonl`,
   replacing the older one.
 - **Limits.** Messages, stacks and notes are cut to a fixed length. Reports
@@ -59,10 +66,14 @@ dropped.
 - A marker file, `logs/running.json`, is written at start and removed on a
   clean quit. A marker found at start means the last run crashed or was
   killed. That becomes an `unclean-exit` entry, which names the crash dumps
-  written since that run began.
-- An uncaught error in the main process is logged, and shown to the user once
-  per fingerprint. The app keeps running, because ending it would end every
-  session in it.
+  written since that run began. The entry carries the build of the run that
+  ended, which the marker remembers, not of the run that found out.
+- An uncaught error in the main process is logged, and the window says so
+  once per fingerprint. The app keeps running, because ending it would end
+  every session in it. For the same reason it is a notice in the window and
+  not a dialog: a dialog holds up the main process, and the sessions with it,
+  until someone answers.
+- A window whose process has died offers to reload or to quit.
 - An error while drawing the window replaces the window with a short message
   and a button to reload.
 

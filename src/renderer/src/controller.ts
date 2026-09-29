@@ -35,6 +35,7 @@ export async function initialize(): Promise<void> {
     track(sessionId, { type: 'exit' })
   })
   api.onMenuCommand(handleMenuCommand)
+  api.onProblem((message) => setState((state) => ({ ...state, error: message })))
 
   window.addEventListener('focus', () => {
     const { activeSessionId } = getState()

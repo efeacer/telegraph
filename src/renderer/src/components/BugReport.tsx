@@ -15,12 +15,19 @@ export function BugReport() {
   const [note, setNote] = useState('')
   const [failed, setFailed] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Read when a save returns, which can be after the dialog has gone.
+  const open = useRef(true)
+  const inFlight = useRef(false)
   const titleId = useId()
   const fieldId = useId()
   const hintId = useId()
 
   useEffect(() => {
+    open.current = true
     dialog.current?.showModal()
+    return () => {
+      open.current = false
+    }
   }, [])
 
   // Closing the dialog itself comes first: while it is open, nothing behind
@@ -38,9 +45,13 @@ export function BugReport() {
   }
 
   const save = async (): Promise<void> => {
-    if (note.trim() === '' || saving) return
+    if (note.trim() === '' || inFlight.current) return
+    inFlight.current = true
     setSaving(true)
     const saved = await saveBugReport(note.trim())
+    inFlight.current = false
+    // Closed in the meantime, and perhaps opened again for another note.
+    if (!open.current) return
     setSaving(false)
     if (saved) close()
     else setFailed(true)

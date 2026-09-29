@@ -57,11 +57,13 @@ export interface TelegraphApi {
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   openExternal(url: string): void
-  /** Resolves to false when the report could not be saved. */
+  /** Resolves to false when the report was not saved. */
   report(report: WindowReport): Promise<boolean>
   /** Tells the main process that the page reports its own errors from here on. */
   reporting(): void
   onSessionData(listener: (sessionId: string, data: string) => void): () => void
   onSessionExit(listener: (sessionId: string, exitCode: number) => void): () => void
   onMenuCommand(listener: (command: MenuCommand) => void): () => void
+  /** Called when the main process has recorded a problem the user should know of. */
+  onProblem(listener: (message: string) => void): () => void
 }

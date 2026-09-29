@@ -59,13 +59,36 @@ export const LIMITS = {
 } as const
 
 const MAX_CAUSES = 5
+const INDESCRIBABLE = 'Something that could not be described'
+
+// A single quote only opens a quotation at the start of a word, which keeps apostrophes.
+const QUOTED = /"[^"\n]*"|`[^`\n]*`|“[^”\n]*”|(?<!\w)'[^'\n]*'(?!\w)/g
 
 export function clip(text: string, limit: number): string {
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`
 }
 
-/** Anything can be thrown, so anything can be described. */
+/**
+ * What a message quotes is often not its own: a library that fails on a
+ * character from a terminal will name that character.
+ */
+export function withoutQuotes(text: string): string {
+  return text.replace(QUOTED, (quoted) => `${quoted[0]}…${quoted.at(-1)}`)
+}
+
+/**
+ * Anything can be thrown, so anything can be described. This runs where an
+ * error of its own would end the app, so it never throws.
+ */
 export function describeProblem(thrown: unknown): { message: string; stack?: string } {
+  try {
+    return describe(thrown)
+  } catch {
+    return { message: INDESCRIBABLE }
+  }
+}
+
+function describe(thrown: unknown): { message: string; stack?: string } {
   if (!(thrown instanceof Error)) return { message: clip(describeValue(thrown), LIMITS.message) }
   const described: { message: string; stack?: string } = {
     message: clip(describeError(thrown), LIMITS.message)
@@ -95,7 +118,12 @@ function describeValue(value: unknown): string {
   try {
     return JSON.stringify(value) ?? String(value)
   } catch {
+    // Not everything can be written as JSON, or as text.
+  }
+  try {
     return String(value)
+  } catch {
+    return Object.prototype.toString.call(value)
   }
 }
 

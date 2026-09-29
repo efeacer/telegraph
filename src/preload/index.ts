@@ -26,7 +26,8 @@ const api: TelegraphApi = {
   reporting: () => ipcRenderer.send(IPC.reporting),
   onSessionData: (listener) => subscribe(IPC.sessionData, listener),
   onSessionExit: (listener) => subscribe(IPC.sessionExit, listener),
-  onMenuCommand: (listener) => subscribe(IPC.menuCommand, listener)
+  onMenuCommand: (listener) => subscribe(IPC.menuCommand, listener),
+  onProblem: (listener) => subscribe(IPC.problem, listener)
 }
 
 contextBridge.exposeInMainWorld('telegraph', api)

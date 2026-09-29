@@ -161,12 +161,15 @@ function registerIpc(store: StateStore): void {
   })
 }
 
-/** The app keeps running after an error, because ending it would end every session in it. */
+/**
+ * The app keeps running after an error, because ending it would end every
+ * session in it. The window says so rather than a dialog, which would hold up
+ * the sessions until someone answered it.
+ */
 function showError(entry: LogEntry): void {
-  if (isE2E) return
-  dialog.showErrorBox(
-    'Telegraph ran into a problem',
-    `It was saved to the bug log. Your sessions are still running.\n\n${entry.stack ?? entry.message}`
+  send(
+    IPC.problem,
+    `Telegraph ran into a problem and saved it to the bug log. Your sessions are still running. ${entry.message}`
   )
 }
 
@@ -175,9 +178,9 @@ function showBugLog(): void {
   else void shell.openPath(dirname(bugLog.filePath))
 }
 
-function offerReload(target: BrowserWindow): void {
+async function offerReload(target: BrowserWindow): Promise<void> {
   if (isE2E || target.isDestroyed()) return
-  const response = dialog.showMessageBoxSync(target, {
+  const { response } = await dialog.showMessageBox(target, {
     type: 'error',
     message: 'The window stopped working',
     detail: 'The problem was saved to the bug log. The sessions in the window could not be kept.',
@@ -185,6 +188,7 @@ function offerReload(target: BrowserWindow): void {
     defaultId: 0,
     cancelId: 1
   })
+  if (target.isDestroyed()) return
   if (response === 0) {
     target.webContents.reload()
   } else {
@@ -242,7 +246,7 @@ function createWindow(): void {
 
   watchWindow(bugLog, created, {
     pageReports: () => pageReports,
-    onCrash: () => offerReload(created)
+    onCrash: () => void offerReload(created)
   })
 
   created.once('ready-to-show', () => created.show())

@@ -1,5 +1,5 @@
 import { app, type BrowserWindow } from 'electron'
-import { describeProblem, type LogEntry } from '@shared/buglog'
+import { describeProblem, withoutQuotes, type LogEntry } from '@shared/buglog'
 import type { BugLog } from './buglog'
 
 // Chromium's code for a load that was called off, which happens whenever one
@@ -20,8 +20,13 @@ export interface WindowEvents {
 /** Records what goes wrong in the main process and the processes that help it. */
 export function watchProcess(log: BugLog, events: ProcessEvents): void {
   process.on('uncaughtException', (error) => {
-    const entry = log.record({ kind: 'main-error', ...describeProblem(error) })
-    if (entry?.count === 1) events.onNewError(entry)
+    // An error thrown from here would end the app, and every session with it.
+    try {
+      const entry = log.record({ kind: 'main-error', ...describeProblem(error) })
+      if (entry?.count === 1) events.onNewError(entry)
+    } catch {
+      // Nothing is left to tell it to.
+    }
   })
 
   process.on('unhandledRejection', (reason) => {
@@ -75,7 +80,8 @@ export function watchWindow(log: BugLog, window: BrowserWindow, events: WindowEv
     if (events.pageReports() && message.startsWith('Uncaught ')) return
     log.record({
       kind: 'console-error',
-      message,
+      // Libraries quote what they choke on, which can come from a terminal.
+      message: withoutQuotes(message),
       detail: { source: sourceId, line: lineNumber }
     })
   })

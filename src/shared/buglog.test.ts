@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LIMITS, checkWindowReport, clip, describeProblem } from './buglog'
+import { LIMITS, checkWindowReport, clip, describeProblem, withoutQuotes } from './buglog'
 
 describe('describeProblem', () => {
   it('takes the message and stack of an error', () => {
@@ -39,12 +39,50 @@ describe('describeProblem', () => {
     expect(describeProblem(undefined)).toEqual({ message: 'undefined' })
   })
 
+  it('describes a value that refuses to be described', () => {
+    const hostile: Record<string, unknown> = Object.create(null)
+    hostile.self = hostile
+    expect(describeProblem(hostile)).toEqual({ message: '[object Object]' })
+  })
+
+  it('describes a value that throws when looked at', () => {
+    const { proxy, revoke } = Proxy.revocable({}, {})
+    revoke()
+    expect(describeProblem(proxy)).toEqual({ message: 'Something that could not be described' })
+  })
+
+  it('describes an error whose message is not text', () => {
+    const error = new Error('replaced')
+    Object.defineProperty(error, 'message', { value: Object.create(null) })
+    expect(describeProblem(error)).toEqual({ message: 'Something that could not be described' })
+  })
+
   it('cuts a long message and stack down to size', () => {
     const error = new Error('x'.repeat(LIMITS.message * 2))
     error.stack = 'y'.repeat(LIMITS.stack * 2)
     const described = describeProblem(error)
     expect(described.message).toHaveLength(LIMITS.message)
     expect(described.stack).toHaveLength(LIMITS.stack)
+  })
+})
+
+describe('withoutQuotes', () => {
+  it('leaves out what a message quotes', () => {
+    expect(withoutQuotes('Could not find drawing instructions for "x"')).toBe(
+      'Could not find drawing instructions for "…"'
+    )
+  })
+
+  it('leaves out every kind of quote', () => {
+    expect(withoutQuotes("read 'one' and `two` and “three”")).toBe('read \'…\' and `…` and “…”')
+  })
+
+  it('keeps an apostrophe', () => {
+    expect(withoutQuotes("The window's process ended")).toBe("The window's process ended")
+  })
+
+  it('leaves plain text alone', () => {
+    expect(withoutQuotes('Failed to load resource')).toBe('Failed to load resource')
   })
 })
 
