@@ -1,29 +1,62 @@
-import { execFile } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { programOf } from '@shared/launchers'
 import type { Launcher } from '@shared/types'
 import { posixShell } from './shell'
 
 const TIMEOUT_MS = 5000
-// The settings of a shell may print what they like, so the answer is marked.
-const MARK = 'telegraph-found:'
-const FIND = `for program in "$@"; do command -v -- "$program" >/dev/null 2>&1 && echo "${MARK}$program"; done`
+// The settings of a shell may print what they like, so the answers are marked
+// and each starts a line of its own. The last mark says the shell got to the
+// end, which its exit status does not: that is the status of the last search.
+const FOUND = 'telegraph-found:'
+const DONE = 'telegraph-done'
+const FIND = [
+  'for program in "$@"; do',
+  `command -v -- "$program" >/dev/null 2>&1 && printf '\\n${FOUND}%s\\n' "$program";`,
+  'done;',
+  `printf '\\n${DONE}\\n'`
+].join(' ')
 
 export type Run = (file: string, args: string[], env: Record<string, string>) => Promise<string>
 
-const runShell: Run = (file, args, env) =>
-  new Promise((resolve, reject) => {
-    execFile(file, args, { timeout: TIMEOUT_MS, env }, (error, stdout) =>
-      // A shell can find every program and still end badly, for reasons of its settings.
-      error && !stdout.includes(MARK) ? reject(error) : resolve(stdout)
-    )
-  })
+/**
+ * Runs a shell and resolves to what it printed. The shell gets nothing to
+ * read, so settings that ask a question go on without an answer, and it is
+ * not waited for longer than it takes to answer or than the time given.
+ */
+export function shellRunner(timeoutMs = TIMEOUT_MS): Run {
+  return (file, args, env) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(file, args, { env, stdio: ['ignore', 'pipe', 'ignore'] })
+      let output = ''
 
-export function readFound(output: string): string[] {
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith(MARK))
-    .map((line) => line.slice(MARK.length))
+      const finish = (settle: () => void): void => {
+        clearTimeout(timer)
+        child.stdout.destroy()
+        // Shells that read the user's settings do not end when asked nicely.
+        child.kill('SIGKILL')
+        settle()
+      }
+      const timer = setTimeout(
+        () => finish(() => reject(new Error(`${file} did not answer in time`))),
+        timeoutMs
+      )
+
+      child.stdout.setEncoding('utf8')
+      child.stdout.on('data', (text: string) => {
+        output += text
+        // What the settings left running may hold the output open long after.
+        if (readFound(output) !== null) finish(() => resolve(output))
+      })
+      child.on('error', (error) => finish(() => reject(error)))
+      child.on('close', () => finish(() => resolve(output)))
+    })
+}
+
+/** The programs the shell found, or null if it did not get to the end of looking. */
+export function readFound(output: string): string[] | null {
+  const lines = output.split('\n').map((line) => line.trim())
+  if (!lines.includes(DONE)) return null
+  return lines.filter((line) => line.startsWith(FOUND)).map((line) => line.slice(FOUND.length))
 }
 
 /**
@@ -35,26 +68,29 @@ export async function findInstalled(
   launchers: Launcher[],
   userShell: string | undefined,
   env: Record<string, string>,
-  run: Run = runShell
+  run: Run = shellRunner()
 ): Promise<string[]> {
+  const everyone = launchers.map((launcher) => launcher.id)
   const programs = [...new Set(launchers.flatMap((launcher) => programOf(launcher) ?? []))]
-  if (programs.length === 0) return launchers.map((launcher) => launcher.id)
+  if (programs.length === 0) return everyone
 
   const shell = posixShell(userShell)
-  let found: Set<string>
+  let found: string[] | null
   try {
     const output = await run(shell, ['-l', '-i', '-c', FIND, 'telegraph', ...programs], {
       ...env,
       SHELL: userShell || shell
     })
-    found = new Set(readFound(output))
+    found = readFound(output)
   } catch {
-    return launchers.map((launcher) => launcher.id)
+    found = null
   }
+  if (found === null) return everyone
+
   return launchers
     .filter((launcher) => {
       const program = programOf(launcher)
-      return program === null || found.has(program)
+      return program === null || found.includes(program)
     })
     .map((launcher) => launcher.id)
 }

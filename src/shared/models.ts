@@ -1,9 +1,11 @@
 import type { Catalogue, Launcher, Model } from './types'
 
 const MODELS_PER_PROVIDER = 12
+const NAME_LENGTH = 80
 // Providers write their models in letters, digits and a few signs. Anything
 // else is not a name the list should be trusted with.
-const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,99}$/
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@[\]-]{0,99}$/
+const DAY = /^\d{4}-\d{2}-\d{2}$/
 const DATED_COPY = /-\d{8}$/
 
 export function isModelId(id: string): boolean {
@@ -17,7 +19,7 @@ export function isModelId(id: string): boolean {
 export function readCatalogue(source: unknown, providers: string[]): Catalogue {
   const catalogue: Catalogue = {}
   for (const provider of providers) {
-    const listed = Object.values(recordAt(recordAt(source, provider), 'models')).flatMap(readModel)
+    const listed = Object.values(recordAt(recordAt(source, provider), 'models')).flatMap(readListed)
     const ids = new Set(listed.map((model) => model.id))
     catalogue[provider] = listed
       .filter((model) => !ids.has(model.id.replace(DATED_COPY, '')) || !DATED_COPY.test(model.id))
@@ -27,24 +29,38 @@ export function readCatalogue(source: unknown, providers: string[]): Catalogue {
   return catalogue
 }
 
-/** The model as Telegraph keeps it, or nothing if an agent has no use for it. */
-function readModel(value: unknown): Model[] {
+/** The model as the list has it, or nothing if an agent has no use for it. */
+function readListed(value: unknown): Model[] {
   if (typeof value !== 'object' || value === null) return []
-  const { id, name, release_date: releasedAt, tool_call: usesTools, status } = value as Record<
-    string,
-    unknown
-  >
-  if (typeof id !== 'string' || !isModelId(id)) return []
+  const { tool_call: usesTools, status, release_date: releasedAt } = value as Record<string, unknown>
   if (usesTools !== true || status === 'deprecated') return []
   const output = recordAt(value, 'modalities').output
   if (!Array.isArray(output) || output.length !== 1 || output[0] !== 'text') return []
+  return readModel({ ...value, releasedAt })
+}
+
+/**
+ * A model from wherever Telegraph reads one: the list, the files it keeps,
+ * the window. A model ends up in a command, so nothing is kept that could
+ * not be one.
+ */
+function readModel(value: unknown): Model[] {
+  if (typeof value !== 'object' || value === null) return []
+  const { id, name, releasedAt } = value as Record<string, unknown>
+  if (typeof id !== 'string' || !isModelId(id)) return []
   return [
     {
       id,
-      name: typeof name === 'string' && name.trim() !== '' ? name : id,
-      ...(typeof releasedAt === 'string' ? { releasedAt } : {})
+      name: typeof name === 'string' && name.trim() !== '' ? name.slice(0, NAME_LENGTH) : id,
+      ...(typeof releasedAt === 'string' && DAY.test(releasedAt) ? { releasedAt } : {})
     }
   ]
+}
+
+/** The models of a list Telegraph has kept. */
+export function readModels(value: unknown): Model[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(readModel).slice(0, MODELS_PER_PROVIDER)
 }
 
 function recordAt(value: unknown, key: string): Record<string, unknown> {

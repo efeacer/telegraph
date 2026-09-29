@@ -61,7 +61,9 @@ A model that is in none of them can be typed in.
 From the catalogue, Telegraph takes the models that can use tools and answer
 in text, leaves out those marked as deprecated, and leaves out dated copies of
 a model that is also listed without a date. Names that hold anything but
-letters, digits and `. _ : / @ -` are left out as well.
+letters, digits and `. _ : / @ [ ] -` are left out as well. A list of more
+than 32 MB is not read, and a provider that is missing from a newer list keeps
+the models it had.
 
 The catalogue is fetched by the main process at most once a day and kept in
 `models.json` in the user data folder, cut down to the providers in use.
@@ -73,14 +75,27 @@ nothing about the user.
 
 At start, Telegraph asks the user's shell which of the programs it can find,
 the same way a session would look for them: as a login shell that reads the
-user's settings. Launchers whose program is missing are not offered. If the
-shell cannot be asked, all of them are.
+user's settings. Launchers whose program is missing are not offered.
+
+Asking must never be what keeps Telegraph from starting:
+
+- The shell gets nothing to read, so settings that ask a question go on
+  without an answer.
+- The shell is given five seconds and then ended. If it has not answered, or
+  did not get to the end of looking, every launcher is offered.
+- The window waits 400 ms for the answer. After that it offers every launcher
+  and leaves out the missing ones when the answer arrives.
+- A command that does not begin with a plain name or path, such as
+  `~/bin/agent` or `(cd sub && claude)`, is offered without looking: only the
+  shell could say what it runs.
 
 ## Remembering
 
 Telegraph remembers per project which launcher was used last and, per
 launcher, which model. The mode is not remembered: continuing a chat is a
-choice made each time.
+choice made each time. A model that was typed in is remembered if its name
+could be in the catalogue. If not, it runs, and the model chosen before stays
+remembered.
 
 The shortcuts and the menus start a launcher with the model remembered for it.
 

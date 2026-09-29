@@ -89,6 +89,18 @@ describe('programOf', () => {
     expect(programOf({ id: 'shell', name: 'Shell', command: null })).toBeNull()
   })
 
+  it('can be a path', () => {
+    expect(programOf({ id: 'a', name: 'A', command: '/opt/homebrew/bin/codex -m x' })).toBe(
+      '/opt/homebrew/bin/codex'
+    )
+  })
+
+  it('is nothing where only a shell could say what runs', () => {
+    for (const command of ['~/bin/agent', '$HOME/bin/agent', '"/bin/ls" -l', '(cd sub && claude)']) {
+      expect(programOf({ id: 'a', name: 'A', command }), command).toBeNull()
+    }
+  })
+
   it('is nothing for an empty command', () => {
     expect(programOf({ id: 'a', name: 'A', command: '   ' })).toBeNull()
   })

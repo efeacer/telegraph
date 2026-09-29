@@ -19,18 +19,21 @@ interface SelectProps {
 }
 
 const TYPING_PAUSE_MS = 700
+const PAGE = 8
 
 /** A blank in a sentence and the list of what can fill it. */
 export function Select({ label, value, options, onChange, ref }: SelectProps) {
   const [open, setOpen] = useState(false)
-  const [active, setActive] = useState(0)
+  // Kept by value: the options can change while the list is open.
+  const [activeValue, setActiveValue] = useState(value)
   const list = useRef<HTMLUListElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const listId = useId()
 
-  const selected = Math.max(
+  const selected = options.findIndex((option) => option.value === value)
+  const active = Math.max(
     0,
-    options.findIndex((option) => option.value === value)
+    options.findIndex((option) => option.value === activeValue)
   )
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
   }, [open, active])
 
   const show = (): void => {
-    setActive(selected)
+    setActiveValue(value)
     setOpen(true)
   }
 
@@ -48,23 +51,29 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
     setOpen(false)
   }
 
-  const step = (offset: number): void =>
-    setActive((index) => Math.min(options.length - 1, Math.max(0, index + offset)))
+  const moveTo = (index: number): void => {
+    const option = options[Math.min(options.length - 1, Math.max(0, index))]
+    if (option) setActiveValue(option.value)
+  }
+
+  const isTyping = (at: number): boolean => at - typed.current.at <= TYPING_PAUSE_MS
 
   /** Moves to the option that starts with what has been typed without a pause. */
   const seek = (character: string, at: number): void => {
-    const text = at - typed.current.at > TYPING_PAUSE_MS ? character : typed.current.text + character
+    const text = isTyping(at) ? typed.current.text + character : character
     typed.current = { text, at }
     const found = options.findIndex((option) => option.label.toLowerCase().startsWith(text))
     if (found === -1) return
-    if (open) setActive(found)
+    if (open) moveTo(found)
     else onChange(options[found]!.value)
   }
 
   const handleKey = (event: KeyboardEvent): void => {
-    if (event.metaKey || event.ctrlKey || event.altKey) return
+    if (event.metaKey || event.ctrlKey) return
     const { key } = event
-    if (key.length === 1 && key !== ' ') {
+    // A space is part of a name while one is being typed, and a key of its own otherwise.
+    if (key.length === 1 && !event.altKey && (key !== ' ' || isTyping(event.timeStamp))) {
+      event.preventDefault()
       seek(key.toLowerCase(), event.timeStamp)
       return
     }
@@ -77,16 +86,22 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
     }
     switch (key) {
       case 'ArrowDown':
-        step(1)
+        moveTo(active + 1)
         break
       case 'ArrowUp':
-        step(-1)
+        moveTo(active - 1)
+        break
+      case 'PageDown':
+        moveTo(active + PAGE)
+        break
+      case 'PageUp':
+        moveTo(active - PAGE)
         break
       case 'Home':
-        setActive(0)
+        moveTo(0)
         break
       case 'End':
-        setActive(options.length - 1)
+        moveTo(options.length - 1)
         break
       case 'Enter':
       case ' ':
@@ -96,7 +111,8 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
         setOpen(false)
         break
       case 'Tab':
-        setOpen(false)
+        // Takes the option and lets the focus move on.
+        choose(active)
         return
       default:
         return
@@ -120,7 +136,7 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
         onKeyDown={handleKey}
         onBlur={() => setOpen(false)}
       >
-        {options[selected]?.label}
+        {options[selected]?.label ?? value}
         <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
           <path d="M2 3.75 5 6.75l3-3" fill="none" stroke="currentColor" strokeWidth="1.5" />
         </svg>
@@ -145,7 +161,7 @@ export function Select({ label, value, options, onChange, ref }: SelectProps) {
               aria-label={option.label}
               aria-description={option.hint}
               className={classNames(option, options[index - 1], index === active)}
-              onMouseEnter={() => setActive(index)}
+              onMouseEnter={() => setActiveValue(option.value)}
               onClick={() => choose(index)}
             >
               <span className="blank-option-label">{option.label}</span>

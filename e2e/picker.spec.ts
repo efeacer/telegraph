@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { choose, createWorkspace, launch, removeWorkspace, start, type Workspace } from './telegraph'
@@ -80,6 +80,43 @@ test('goes back to the list when typing a model is given up', async () => {
   await expect(blank('Model')).toBeFocused()
 })
 
+test('goes back to the list by the button beside the model', async () => {
+  await choose(page, 'Agent', 'Parrot')
+  await choose(page, 'Model', 'another model…')
+  await page.getByRole('button', { name: 'Choose from the list' }).click()
+
+  await expect(blank('Model')).toHaveText('its usual model')
+  await expect(blank('Model')).toBeFocused()
+})
+
+test('keeps the model chosen before when the one typed in cannot be kept', async () => {
+  await choose(page, 'Agent', 'Parrot')
+  await choose(page, 'Model', 'Swift 4')
+  await page.getByRole('button', { name: 'Start Parrot' }).click()
+  await expect(terminal()).toContainText('started with --model swift-4')
+  await page.getByRole('button', { name: /^End / }).click()
+
+  await choose(page, 'Model', 'another model…')
+  await page.getByRole('textbox', { name: 'Model' }).fill('two words')
+  await page.keyboard.press('Enter')
+  await expect(terminal()).toContainText('started with --model two words')
+
+  await expect
+    .poll(() => savedState().choices)
+    .toEqual({ 'project-1': { launcherId: 'parrot', models: { parrot: 'swift-4' } } })
+})
+
+test('keeps what was chosen when the session could not start', async () => {
+  rmSync(workspace.projectPath, { recursive: true })
+  await choose(page, 'Agent', 'Parrot')
+  await choose(page, 'Model', 'Swift 5')
+  await page.getByRole('button', { name: 'Start Parrot' }).click()
+  await expect(page.getByRole('alert')).toContainText('Could not start Parrot')
+
+  await expect(blank('Agent')).toHaveText('Parrot')
+  await expect(blank('Model')).toHaveText('Swift 5')
+})
+
 test('continues the last chat', async () => {
   await choose(page, 'Agent', 'Parrot')
   await choose(page, 'Model', 'Swift, latest')
@@ -117,6 +154,26 @@ test('can be filled in from the keyboard', async () => {
   await page.keyboard.press('Escape')
   await expect(page.getByRole('listbox')).toHaveCount(0)
   await expect(blank('Agent')).toBeFocused()
+})
+
+test('finds a model by typing its name, spaces and all', async () => {
+  await choose(page, 'Agent', 'Parrot')
+  await blank('Model').focus()
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('swift 4')
+  await expect(page.getByRole('option', { name: 'Swift 4' })).toHaveClass(/is-active/)
+  await page.keyboard.press('Enter')
+  await expect(blank('Model')).toHaveText('Swift 4')
+})
+
+test('takes the option it is on when the keyboard moves on', async () => {
+  await blank('Agent').focus()
+  await page.keyboard.press('Alt+ArrowDown')
+  await page.keyboard.press('End')
+  await page.keyboard.press('Tab')
+  await expect(blank('Agent')).toHaveText('Parrot')
+  await expect(page.getByRole('listbox')).toHaveCount(0)
+  await expect(blank('Model')).toBeFocused()
 })
 
 test('remembers what was chosen in the project', async () => {
@@ -169,6 +226,20 @@ test('shows the choice again while sessions are open', async () => {
   await page.getByRole('menuitem', { name: 'Choose a model…' }).click()
   await expect(page.getByRole('heading', { name: 'Start a session in signal-box' })).toBeVisible()
   await expect(blank('Agent')).toHaveText('Shell')
+})
+
+test('goes back to the session when the choice is closed', async () => {
+  await start(page, 'Shell')
+  await page.getByRole('button', { name: 'Start a session in signal-box' }).click()
+  await page.getByRole('menuitem', { name: 'Choose a model…' }).click()
+  await expect(blank('Agent')).toBeVisible()
+
+  await app.evaluate(({ Menu }) => {
+    const session = Menu.getApplicationMenu()?.items.find((item) => item.label === 'Session')
+    session?.submenu?.items.find((item) => item.label === 'End Session')?.click()
+  })
+  await expect(terminal()).toBeVisible()
+  await expect(page.locator('.session')).toHaveCount(1)
 })
 
 test('keeps the launchers the user wrote in the file', async () => {

@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { basename, dirname } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { DEFAULT_LAUNCHERS } from '@shared/launchers'
-import { isModelId } from '@shared/models'
-import type { Choice, Launcher, Mode, Model, PersistedState, Project } from '@shared/types'
+import { isModelId, readModels } from '@shared/models'
+import type { Choice, Launcher, Mode, PersistedState, Project } from '@shared/types'
 
 // The first version wrote its launchers to the file in full. Left as they
 // are, they would keep the ones Telegraph comes with now from showing up.
@@ -25,15 +25,6 @@ function isProject(value: unknown): value is Project {
     typeof value.id === 'string' &&
     typeof value.name === 'string' &&
     typeof value.path === 'string'
-  )
-}
-
-function isModel(value: unknown): value is Model {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    isModelId(value.id) &&
-    typeof value.name === 'string'
   )
 }
 
@@ -58,7 +49,7 @@ function readLauncher(value: unknown): Launcher[] {
   if (Array.isArray(providers)) {
     launcher.providers = providers.filter((provider) => typeof provider === 'string')
   }
-  if (Array.isArray(models)) launcher.models = models.filter(isModel)
+  if (Array.isArray(models)) launcher.models = readModels(models)
   if (Array.isArray(modes)) launcher.modes = modes.filter(isMode)
   return [launcher]
 }
@@ -78,7 +69,10 @@ export function parseState(json: string): PersistedState {
   if (typeof raw !== 'object' || raw === null) throw new Error('State is not an object')
   const projects = Array.isArray(raw.projects) ? raw.projects.filter(isProject) : []
   const launchers = Array.isArray(raw.launchers) ? raw.launchers.flatMap(readLauncher) : []
-  const comesWith = launchers.length === 0 || isDeepStrictEqual(launchers, FIRST_LAUNCHERS)
+  const comesWith =
+    launchers.length === 0 ||
+    isDeepStrictEqual(launchers, FIRST_LAUNCHERS) ||
+    isDeepStrictEqual(launchers, DEFAULT_LAUNCHERS)
 
   const choices: Record<string, Choice> = {}
   for (const [projectId, value] of Object.entries(isRecord(raw.choices) ? raw.choices : {})) {

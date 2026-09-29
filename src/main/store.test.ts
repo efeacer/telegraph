@@ -176,7 +176,13 @@ describe('parseState', () => {
       { id: 'claude-continue', name: 'Claude, continue last chat', command: 'claude --continue' },
       { id: 'claude-resume', name: 'Claude, pick a chat to resume', command: 'claude --resume' }
     ]
-    expect(parseState(JSON.stringify({ launchers: first })).launchers).toEqual(DEFAULT_LAUNCHERS)
+    // The same list and not a copy of it, which would be written to the file.
+    expect(parseState(JSON.stringify({ launchers: first })).launchers).toBe(DEFAULT_LAUNCHERS)
+  })
+
+  it('takes launchers that are the ones it comes with for just that', () => {
+    const same = JSON.parse(JSON.stringify(DEFAULT_LAUNCHERS))
+    expect(parseState(JSON.stringify({ launchers: same })).launchers).toBe(DEFAULT_LAUNCHERS)
   })
 
   it('keeps the launchers of the first version once the user has edited them', () => {

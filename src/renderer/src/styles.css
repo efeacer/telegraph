@@ -691,8 +691,7 @@ button:focus-visible {
   margin-top: 26px;
 }
 
-/* Named through .empty, whose paragraphs would otherwise set the margin and the colour. */
-.empty .picker-line {
+.picker-line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -760,6 +759,12 @@ button:focus-visible {
   background: none;
   user-select: text;
   cursor: text;
+}
+
+.blank-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .blank-input::placeholder {

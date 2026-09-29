@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isModelId, modelsFor, readCatalogue } from './models'
+import { isModelId, modelsFor, readCatalogue, readModels } from './models'
 import type { Launcher } from './types'
 
 function listed(changes: Record<string, unknown> = {}): Record<string, unknown> {
@@ -96,6 +96,16 @@ describe('readCatalogue', () => {
     expect(catalogue.anthropic?.[0]?.name).toBe('claude-opus-5-5')
   })
 
+  it('cuts a name that goes on and on', () => {
+    const catalogue = readCatalogue(source([listed({ name: 'n'.repeat(5000) })]), ['anthropic'])
+    expect(catalogue.anthropic?.[0]?.name).toHaveLength(80)
+  })
+
+  it('leaves out a date that is not one', () => {
+    const catalogue = readCatalogue(source([listed({ release_date: 'd'.repeat(5000) })]), ['anthropic'])
+    expect(catalogue.anthropic).toEqual([{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }])
+  })
+
   it('keeps at most twelve models of a provider', () => {
     const many = Array.from({ length: 20 }, (_, index) =>
       listed({ id: `model-${index}`, release_date: `2026-01-${String(index + 1).padStart(2, '0')}` })
@@ -115,9 +125,26 @@ describe('readCatalogue', () => {
   })
 })
 
+describe('readModels', () => {
+  it('reads the models Telegraph has kept', () => {
+    const kept = [{ id: 'opus', name: 'Latest Opus' }, { id: 'swift-5', name: 'Swift 5', releasedAt: '2026-09-01' }]
+    expect(readModels(kept)).toEqual(kept)
+  })
+
+  it('drops what is not a model', () => {
+    expect(readModels([{ id: 'a; rm -rf ~', name: 'Trouble' }, { name: 'Nameless' }, 'text', null])).toEqual([])
+    expect(readModels('nonsense')).toEqual([])
+  })
+
+  it('reads at most twelve', () => {
+    const many = Array.from({ length: 100 }, (_, index) => ({ id: `m-${index}`, name: `M ${index}` }))
+    expect(readModels(many)).toHaveLength(12)
+  })
+})
+
 describe('isModelId', () => {
   it('accepts the names providers give their models', () => {
-    for (const id of ['opus', 'claude-opus-5-5', 'gpt-5.6', 'anthropic/claude-opus-5.5:batch', 'a@b_c']) {
+    for (const id of ['opus', 'opus[1m]', 'gpt-5.6', 'anthropic/claude-opus-5.5:batch', 'a@b_c']) {
       expect(isModelId(id), id).toBe(true)
     }
   })

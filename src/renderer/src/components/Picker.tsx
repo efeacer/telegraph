@@ -54,11 +54,14 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
     setTyping(true)
   }
 
-  const stopTyping = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape') return
+  const stopTyping = (): void => {
     returning.current = true
     setModel(USUAL)
     setTyping(false)
+  }
+
+  const stopTypingOnEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') stopTyping()
   }
 
   const start = (event: FormEvent): void => {
@@ -86,7 +89,7 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
 
   return (
     <form className="picker" onSubmit={start}>
-      <p className="picker-line">
+      <div className="picker-line">
         <Select
           label="Agent"
           value={launcher.id}
@@ -97,18 +100,36 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
           <>
             <span className="picker-word">on</span>
             {typing ? (
-              <input
-                className="blank-input"
-                aria-label="Model"
-                placeholder="the name of a model"
-                autoFocus
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                onKeyDown={stopTyping}
-              />
+              <span className="blank-typing">
+                <input
+                  className="blank-input"
+                  aria-label="Model"
+                  placeholder="the name of a model"
+                  autoFocus
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  onKeyDown={stopTypingOnEscape}
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Choose from the list"
+                  title="Choose from the list"
+                  onClick={stopTyping}
+                >
+                  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                    <path
+                      d="M2.5 2.5l7 7M9.5 2.5l-7 7"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </span>
             ) : (
               <Select
                 label="Model"
@@ -134,7 +155,7 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
             />
           </>
         )}
-      </p>
+      </div>
       <button type="submit" className="action-button">
         Start {launcher.name}
       </button>

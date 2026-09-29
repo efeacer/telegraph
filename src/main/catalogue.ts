@@ -1,15 +1,18 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { isModelId, readCatalogue } from '@shared/models'
-import type { Catalogue, Model } from '@shared/types'
+import { readCatalogue, readModels } from '@shared/models'
+import type { Catalogue } from '@shared/types'
 
 const SOURCE_URL = 'https://models.dev/api.json'
 const DAY_MS = 24 * 60 * 60 * 1000
 const TIMEOUT_MS = 10_000
+// The list is a few megabytes. One many times that size is not the list.
+const MAX_LENGTH = 32 * 1024 * 1024
 
 interface Answer {
   ok: boolean
-  json(): Promise<unknown>
+  headers: { get(name: string): string | null }
+  text(): Promise<string>
 }
 
 export type Fetch = (url: string, options: { signal: AbortSignal }) => Promise<Answer>
@@ -50,6 +53,11 @@ export class ModelCatalogue {
 
     const fetched = await this.ask()
     if (fetched === null) return kept?.providers ?? {}
+
+    // A provider the list has lost, for a day or for good, keeps the models it had.
+    for (const [provider, models] of Object.entries(kept?.providers ?? {})) {
+      if (provider in fetched && fetched[provider]!.length === 0) fetched[provider] = models
+    }
     this.write({ fetchedAt: this.now(), providers: fetched })
     return fetched
   }
@@ -66,8 +74,10 @@ export class ModelCatalogue {
     if (fetch === null) return null
     try {
       const answer = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-      if (!answer.ok) return null
-      const catalogue = readCatalogue(await answer.json(), providers)
+      if (!answer.ok || Number(answer.headers.get('content-length')) > MAX_LENGTH) return null
+      const text = await answer.text()
+      if (text.length > MAX_LENGTH) return null
+      const catalogue = readCatalogue(JSON.parse(text), providers)
       // A page that has moved answers too, with no models in it.
       return Object.values(catalogue).some((models) => models.length > 0) ? catalogue : null
     } catch {
@@ -84,9 +94,10 @@ export class ModelCatalogue {
       if (typeof fetchedAt !== 'number' || typeof providers !== 'object' || providers === null) {
         return null
       }
+      // The file can be edited, and what is in it ends up in a command.
       const kept: Catalogue = {}
       for (const [provider, models] of Object.entries(providers)) {
-        if (Array.isArray(models)) kept[provider] = models.filter(isModel)
+        if (Array.isArray(models)) kept[provider] = readModels(models)
       }
       return { fetchedAt, providers: kept }
     } catch {
@@ -104,16 +115,4 @@ export class ModelCatalogue {
       // The list is asked for again at the next start.
     }
   }
-}
-
-// The file can be edited, and what is in it ends up in a command.
-function isModel(value: unknown): value is Model {
-  const model = value as Model
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof model.id === 'string' &&
-    isModelId(model.id) &&
-    typeof model.name === 'string'
-  )
 }

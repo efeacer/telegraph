@@ -4,6 +4,8 @@ export const SHELL_LAUNCHER_ID = 'shell'
 export const CLAUDE_LAUNCHER_ID = 'claude'
 
 const VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*=/
+// A name or a path, with nothing in it that a shell would make something else of.
+const PLAIN = /^[A-Za-z0-9._+/-]+$/
 
 export const DEFAULT_LAUNCHERS: Launcher[] = [
   { id: SHELL_LAUNCHER_ID, name: 'Shell', command: null },
@@ -72,8 +74,12 @@ export function composeCommand(launcher: Launcher, start: Start): string | null 
   return parts.join(' ')
 }
 
-/** The program a launcher runs, which has to be installed for it to work. */
+/**
+ * The program a launcher runs, which has to be installed for it to work.
+ * Null where there is none, or where only a shell could say what it is.
+ */
 export function programOf(launcher: Launcher): string | null {
   const words = launcher.command?.trim().split(/\s+/) ?? []
-  return words.find((word) => word !== '' && !VARIABLE.test(word)) ?? null
+  const program = words.find((word) => word !== '' && !VARIABLE.test(word))
+  return program !== undefined && PLAIN.test(program) ? program : null
 }

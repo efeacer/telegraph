@@ -36,8 +36,12 @@ afterEach(() => {
   rmSync(directory, { recursive: true, force: true })
 })
 
-function answering(body: unknown, ok = true) {
-  return vi.fn<Fetch>(async () => ({ ok, json: async () => body }))
+function answering(body: unknown, ok = true, length: string | null = null) {
+  return vi.fn<Fetch>(async () => ({
+    ok,
+    headers: { get: (name) => (name === 'content-length' ? length : null) },
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body))
+  }))
 }
 
 function open(fetch: Fetch | null, providers = ['anthropic']): ModelCatalogue {
@@ -101,6 +105,33 @@ describe('ModelCatalogue', () => {
     time += 25 * HOUR_MS
 
     expect(await open(answering('<html>moved</html>')).load()).toEqual({ anthropic: [OPUS] })
+  })
+
+  it('keeps the models of a provider that is missing from a newer list', async () => {
+    const gpt = { id: 'gpt-6-sol', name: 'GPT-6 Sol', release_date: '2026-09-22', tool_call: true, modalities: { output: ['text'] } }
+    await open(answering({ ...LISTED, openai: { models: { 'gpt-6-sol': gpt } } }), ['anthropic', 'openai']).load()
+    time += 25 * HOUR_MS
+
+    expect(await open(answering(LISTED), ['anthropic', 'openai']).load()).toEqual({
+      anthropic: [OPUS],
+      openai: [{ id: 'gpt-6-sol', name: 'GPT-6 Sol', releasedAt: '2026-09-22' }]
+    })
+  })
+
+  it('refuses a list that is far too long', async () => {
+    const fetch = answering(LISTED, true, String(500 * 1024 * 1024))
+    expect(await open(fetch).load()).toEqual({})
+  })
+
+  it('refuses a list that turns out far too long', async () => {
+    const padded = JSON.stringify({ ...LISTED, padding: 'p'.repeat(33 * 1024 * 1024) })
+    expect(await open(answering(padded)).load()).toEqual({})
+  })
+
+  it('reads at most twelve kept models of a provider', async () => {
+    const many = Array.from({ length: 500 }, (_, index) => ({ id: `m-${index}`, name: `M ${index}` }))
+    writeKept({ fetchedAt: NOON, providers: { anthropic: many } })
+    expect((await open(null).load()).anthropic).toHaveLength(12)
   })
 
   it('has nothing when it has never been able to ask', async () => {

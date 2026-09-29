@@ -1,12 +1,15 @@
 import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
-import type { Choice, MenuCommand, Model, Start } from '@shared/types'
+import type { Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
 import { getState, orderedSessions, setState, type SessionView } from './store'
 import { TerminalManager } from './terminals'
 
 const TICK_INTERVAL_MS = 500
+// How long the window waits to hear which programs are installed before it
+// offers all of them. A shell that reads a lot of settings can take longer.
+const DETECTION_GRACE_MS = 400
 const GIT_REFRESH_INTERVAL_MS = 10_000
 const SESSION_ENDED_NOTE = '\r\n\x1b[2mSession ended.\x1b[0m\r\n'
 
@@ -19,18 +22,6 @@ export function attachTerminalHost(host: HTMLElement): void {
 }
 
 export async function initialize(): Promise<void> {
-  const [persisted, installed] = await Promise.all([api.loadState(), api.installedLaunchers()])
-  setState((state) => ({
-    ...state,
-    loaded: true,
-    projects: persisted.projects,
-    launchers: persisted.launchers.filter((launcher) => installed.includes(launcher.id)),
-    choices: persisted.choices,
-    selectedProjectId: persisted.projects[0]?.id ?? null
-  }))
-  // The list may have to come from the network, which nothing else waits for.
-  void api.loadCatalogue().then((catalogue) => setState((state) => ({ ...state, catalogue })))
-
   api.onSessionData((sessionId, data) => {
     terminals.write(sessionId, data)
     track(sessionId, { type: 'output', at: performance.now() })
@@ -41,6 +32,35 @@ export async function initialize(): Promise<void> {
   })
   api.onMenuCommand(handleMenuCommand)
   api.onProblem((message) => setState((state) => ({ ...state, error: message })))
+
+  const persisted = await api.loadState()
+  // Null when it cannot be told, in which case every launcher is offered.
+  const detection = api.installedLaunchers().catch(() => null)
+  const installed = await Promise.race([
+    detection,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), DETECTION_GRACE_MS))
+  ])
+  const offer = (ids: string[] | null) => (launcher: Launcher) =>
+    ids === null || ids.includes(launcher.id)
+
+  setState((state) => ({
+    ...state,
+    loaded: true,
+    projects: persisted.projects,
+    launchers: persisted.launchers.filter(offer(installed)),
+    choices: persisted.choices,
+    selectedProjectId: persisted.projects[0]?.id ?? null
+  }))
+  if (installed === null) {
+    void detection.then((ids) =>
+      setState((state) => ({ ...state, launchers: state.launchers.filter(offer(ids)) }))
+    )
+  }
+  // The list may have to come from the network, which nothing else waits for.
+  void api
+    .loadCatalogue()
+    .then((catalogue) => setState((state) => ({ ...state, catalogue })))
+    .catch(() => {})
 
   window.addEventListener('focus', () => {
     const { activeSessionId } = getState()
@@ -123,6 +143,7 @@ export async function startSession(
           id: modelId,
           name: modelId
         })
+  // Also if the session then fails to start, so that the choice is still there to try again.
   remember(projectId, launcherId, modelId)
 
   const sessionId = crypto.randomUUID()
@@ -166,12 +187,21 @@ export async function startSession(
 }
 
 function remember(projectId: string, launcherId: string, modelId: string | null): void {
-  const { [launcherId]: _before, ...models } = getState().choices[projectId]?.models ?? {}
-  // The state file keeps no name that could not be a model's, so neither does the window.
-  if (modelId !== null && isModelId(modelId)) models[launcherId] = modelId
+  const models = { ...getState().choices[projectId]?.models }
+  // A name that could not be a model's is not kept, and the one chosen before stays.
+  if (modelId === null) delete models[launcherId]
+  else if (isModelId(modelId)) models[launcherId] = modelId
   const choice: Choice = { launcherId, models }
   setState((state) => ({ ...state, choices: { ...state.choices, [projectId]: choice } }))
   api.saveChoice(projectId, choice)
+}
+
+/** Goes back to the session the choice of what to start was opened over. False if there is none. */
+function closePicker(): boolean {
+  const { sessions, selectedProjectId } = getState()
+  const latest = sessions.filter((session) => session.projectId === selectedProjectId).at(-1)
+  if (latest) activateSession(latest.id)
+  return latest !== undefined
 }
 
 export function activateSession(sessionId: string): void {
@@ -315,7 +345,7 @@ function handleMenuCommand(command: MenuCommand): void {
       break
     case 'close-session':
       if (activeSessionId) void endSession(activeSessionId)
-      else window.close()
+      else if (!closePicker()) window.close()
       break
     case 'next-session':
       stepSession(1)
