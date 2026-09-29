@@ -20,9 +20,14 @@ xterm.js, with sessions running in node-pty.
 | `npm run dev` | Runs the app with its own data, in `Telegraph Dev` |
 | `npm run typecheck` | Checks the types |
 | `npm test` | Runs the unit tests |
-| `npm run test:e2e` | Builds the app and runs the end-to-end tests, which open windows |
+| `npm run test:e2e` | Builds the app and runs the end-to-end tests |
 | `npm run bugs` | Prints the problems the app has recorded |
 | `npm run install:app` | Packages the app and copies it to /Applications |
+
+The end-to-end tests open a window per test. The windows stay in the
+background and out of the Dock, because the user is often at work in the
+installed Telegraph while the tests run: see `isE2E` in `src/main/index.ts`.
+Keep it that way, and say so before running them.
 
 `npm run install:app` refuses to run while Telegraph is open, because
 replacing the app ends every session in it. Claude often runs inside

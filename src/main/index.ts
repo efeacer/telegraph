@@ -39,6 +39,11 @@ if (process.env.TELEGRAPH_USER_DATA) {
   app.setPath('userData', join(app.getPath('appData'), 'Telegraph Dev'))
 }
 
+// The tests start the app many times over, often while the user is at work in
+// the Telegraph they have installed. The app under test stays out of the Dock
+// and never comes to the front, so that it takes no keys meant for another.
+if (isE2E) app.dock?.hide()
+
 // Crash dumps stay on this machine, where the bug log can point to them.
 crashReporter.start({ uploadToServer: false })
 
@@ -265,7 +270,7 @@ function createWindow(): void {
     onCrash: () => void offerReload(created)
   })
 
-  created.once('ready-to-show', () => created.show())
+  created.once('ready-to-show', () => (isE2E ? created.showInactive() : created.show()))
 
   created.on('close', (event) => {
     if (quitConfirmed) return
