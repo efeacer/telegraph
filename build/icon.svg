@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22333f"/>
+      <stop offset="1" stop-color="#0e171f"/>
+    </linearGradient>
+  </defs>
+  <!-- A night sky, a wire, and one letter in Morse: a dot and a dash. -->
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#sky)"/>
+  <rect x="102" y="102" width="820" height="820" rx="184" fill="none" stroke="#3d5161" stroke-width="4"/>
+  <path d="M100 512H924" stroke="#3d5161" stroke-width="14"/>
+  <circle cx="330" cy="512" r="74" fill="#7fd1c4"/>
+  <rect x="478" y="450" width="300" height="124" rx="62" fill="#dba544"/>
+</svg>

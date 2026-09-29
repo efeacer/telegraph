@@ -1,0 +1,17 @@
+appId: dev.efeacer.telegraph
+productName: Telegraph
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+# node-pty loads a prebuilt N-API binary and spawns a helper executable,
+# neither of which can run from inside the asar archive.
+asarUnpack:
+  - node_modules/node-pty/**
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  target: dir
+  identity: "-"
