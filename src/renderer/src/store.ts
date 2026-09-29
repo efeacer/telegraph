@@ -20,6 +20,7 @@ export interface AppState {
   activeSessionId: string | null
   selectedProjectId: string | null
   error: string | null
+  reportingBug: boolean
 }
 
 let state: AppState = {
@@ -30,7 +31,8 @@ let state: AppState = {
   sessions: [],
   activeSessionId: null,
   selectedProjectId: null,
-  error: null
+  error: null,
+  reportingBug: false
 }
 
 const listeners = new Set<() => void>()

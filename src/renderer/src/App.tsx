@@ -1,3 +1,4 @@
+import { BugReport } from './components/BugReport'
 import { Sidebar } from './components/Sidebar'
 import { Stage } from './components/Stage'
 import { useAppState } from './store'
@@ -8,6 +9,7 @@ export function App() {
     <div className="app">
       <Sidebar state={state} />
       <Stage state={state} />
+      {state.reportingBug && <BugReport />}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
 import type { MenuCommand } from '@shared/types'
+import { report } from './problems'
 import { getState, orderedSessions, setState, type SessionView } from './store'
 import { TerminalManager } from './terminals'
 
@@ -159,6 +160,33 @@ export function dismissError(): void {
   setState((state) => ({ ...state, error: null }))
 }
 
+export function openBugReport(): void {
+  setState((state) => ({ ...state, reportingBug: true }))
+}
+
+export function closeBugReport(): void {
+  setState((state) => ({ ...state, reportingBug: false }))
+  const { activeSessionId } = getState()
+  if (activeSessionId) terminals.focus(activeSessionId)
+}
+
+/** Saves the note with the state of the sessions, and nothing that was in them. */
+export function saveBugReport(note: string): Promise<boolean> {
+  const { projects, sessions, activeSessionId } = getState()
+  return report({
+    kind: 'bug-report',
+    message: note,
+    detail: {
+      projects: projects.length,
+      sessions: sessions.map((session) => ({
+        launcher: session.launcherName,
+        status: session.status,
+        active: session.id === activeSessionId
+      }))
+    }
+  })
+}
+
 function discardSession(sessionId: string): void {
   const before = getState()
   const order = orderedSessions(before)
@@ -258,6 +286,9 @@ function handleMenuCommand(command: MenuCommand): void {
     }
     case 'clear':
       if (activeSessionId) terminals.clear(activeSessionId)
+      break
+    case 'report-bug':
+      openBugReport()
       break
   }
 }

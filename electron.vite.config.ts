@@ -33,7 +33,9 @@ function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   main: {
-    resolve: { alias }
+    resolve: { alias },
+    // The bug log says which build a problem came from.
+    define: { __BUILT_AT__: JSON.stringify(new Date().toISOString()) }
   },
   preload: {
     resolve: { alias },

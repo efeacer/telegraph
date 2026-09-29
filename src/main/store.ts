@@ -38,7 +38,10 @@ export function parseState(json: string): PersistedState {
 export class StateStore {
   private state: PersistedState
 
-  constructor(private readonly filePath: string) {
+  constructor(
+    private readonly filePath: string,
+    private readonly onUnreadable: (error: unknown, backupPath: string) => void = () => {}
+  ) {
     this.state = this.read()
   }
 
@@ -77,6 +80,7 @@ export class StateStore {
       const backupPath = `${this.filePath}.unreadable-${Date.now()}`
       renameSync(this.filePath, backupPath)
       console.error(`Could not read ${this.filePath}, moved it to ${backupPath}:`, error)
+      this.onUnreadable(error, backupPath)
       return { projects: [], launchers: DEFAULT_LAUNCHERS }
     }
   }

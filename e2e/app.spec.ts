@@ -1,47 +1,18 @@
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import { createWorkspace, launch, removeWorkspace, type Workspace } from './telegraph'
 
-let workspace: string
-let projectPath: string
+let workspace: Workspace
 let app: ElectronApplication
 let page: Page
 
 test.beforeEach(async () => {
-  workspace = realpathSync(mkdtempSync(join(tmpdir(), 'telegraph-e2e-')))
-  projectPath = join(workspace, 'signal-box')
-  mkdirSync(projectPath)
-
-  const userData = join(workspace, 'user-data')
-  mkdirSync(userData)
-  writeFileSync(
-    join(userData, 'state.json'),
-    JSON.stringify({
-      projects: [{ id: 'project-1', name: 'signal-box', path: projectPath }],
-      launchers: [
-        { id: 'shell', name: 'Shell', command: null },
-        { id: 'greeter', name: 'Greeter', command: 'echo "launched in $(basename "$PWD")"' }
-      ]
-    })
-  )
-
-  app = await electron.launch({
-    args: [join(__dirname, '..')],
-    env: {
-      ...process.env,
-      TELEGRAPH_E2E: '1',
-      TELEGRAPH_USER_DATA: userData,
-      // A plain shell keeps the tests independent of the user's own setup.
-      SHELL: '/bin/sh'
-    }
-  })
-  page = await app.firstWindow()
+  workspace = createWorkspace()
+  ;({ app, page } = await launch(workspace))
 })
 
 test.afterEach(async () => {
   await app.close()
-  rmSync(workspace, { recursive: true, force: true })
+  removeWorkspace(workspace)
 })
 
 function terminal(): ReturnType<Page['locator']> {

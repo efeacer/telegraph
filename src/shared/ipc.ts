@@ -10,7 +10,9 @@ export const IPC = {
   sessionData: 'session:data',
   sessionExit: 'session:exit',
   openExternal: 'shell:open-external',
-  menuCommand: 'menu:command'
+  menuCommand: 'menu:command',
+  report: 'log:report',
+  reporting: 'log:reporting'
 } as const
 
 export const E2E_ARGUMENT = '--telegraph-e2e'

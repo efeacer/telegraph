@@ -1,21 +1,27 @@
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { release } from 'node:os'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   BrowserWindow,
   Menu,
   app,
+  crashReporter,
   dialog,
   ipcMain,
   shell,
   type IpcMainEvent,
   type IpcMainInvokeEvent
 } from 'electron'
+import { checkWindowReport, describeProblem, type LogEntry } from '@shared/buglog'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
+import { BugLog } from './buglog'
 import { readGitStatus } from './git'
 import { buildMenu } from './menu'
 import { PtyManager } from './pty'
 import { StateStore } from './store'
+import { watchProcess, watchWindow } from './watch'
 
 const isE2E = process.env.TELEGRAPH_E2E === '1'
 const devServerUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL
@@ -29,8 +35,25 @@ if (process.env.TELEGRAPH_USER_DATA) {
   app.setPath('userData', join(app.getPath('appData'), 'Telegraph Dev'))
 }
 
+// Crash dumps stay on this machine, where the bug log can point to them.
+crashReporter.start({ uploadToServer: false })
+
+const bugLog = new BugLog({
+  directory: join(app.getPath('userData'), 'logs'),
+  crashDumps: app.getPath('crashDumps'),
+  build: {
+    version: app.getVersion(),
+    builtAt: __BUILT_AT__,
+    packaged: app.isPackaged,
+    electron: process.versions.electron,
+    platform: `${process.platform} ${release()} ${process.arch}`
+  }
+})
+watchProcess(bugLog, { onNewError: showError })
+
 let window: BrowserWindow | null = null
 let quitConfirmed = false
+let pageReports = false
 
 const sessions = new PtyManager(app.getVersion(), {
   onData: (sessionId, data) => send(IPC.sessionData, sessionId, data),
@@ -57,9 +80,14 @@ function handle<Args extends unknown[], Result>(
   channel: string,
   handler: (...args: Args) => Result | Promise<Result>
 ): void {
-  ipcMain.handle(channel, (event, ...args) => {
-    if (!isTrusted(event)) throw new Error(`Rejected ${channel} from an unknown page`)
-    return handler(...(args as Args))
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      if (!isTrusted(event)) throw new Error(`Rejected ${channel} from an unknown page`)
+      return await handler(...(args as Args))
+    } catch (error) {
+      bugLog.record({ kind: 'ipc-error', ...describeProblem(error), detail: { channel } })
+      throw error
+    }
   })
 }
 
@@ -93,6 +121,7 @@ function registerIpc(store: StateStore): void {
       sessions.create(request)
       return { ok: true }
     } catch (error) {
+      bugLog.record({ kind: 'session-failure', ...describeProblem(error) })
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
@@ -121,6 +150,47 @@ function registerIpc(store: StateStore): void {
   )
 
   listen(IPC.openExternal, (url: string) => openInBrowser(url))
+
+  handle(IPC.report, (report: unknown) => {
+    const checked = checkWindowReport(report)
+    return checked !== null && bugLog.record(checked) !== null
+  })
+
+  listen(IPC.reporting, () => {
+    pageReports = true
+  })
+}
+
+/** The app keeps running after an error, because ending it would end every session in it. */
+function showError(entry: LogEntry): void {
+  if (isE2E) return
+  dialog.showErrorBox(
+    'Telegraph ran into a problem',
+    `It was saved to the bug log. Your sessions are still running.\n\n${entry.stack ?? entry.message}`
+  )
+}
+
+function showBugLog(): void {
+  if (existsSync(bugLog.filePath)) shell.showItemInFolder(bugLog.filePath)
+  else void shell.openPath(dirname(bugLog.filePath))
+}
+
+function offerReload(target: BrowserWindow): void {
+  if (isE2E || target.isDestroyed()) return
+  const response = dialog.showMessageBoxSync(target, {
+    type: 'error',
+    message: 'The window stopped working',
+    detail: 'The problem was saved to the bug log. The sessions in the window could not be kept.',
+    buttons: ['Reload', 'Quit'],
+    defaultId: 0,
+    cancelId: 1
+  })
+  if (response === 0) {
+    target.webContents.reload()
+  } else {
+    quitConfirmed = true
+    app.quit()
+  }
 }
 
 function openInBrowser(url: string): void {
@@ -170,6 +240,11 @@ function createWindow(): void {
   })
   const created = window
 
+  watchWindow(bugLog, created, {
+    pageReports: () => pageReports,
+    onCrash: () => offerReload(created)
+  })
+
   created.once('ready-to-show', () => created.show())
 
   created.on('close', (event) => {
@@ -188,7 +263,9 @@ function createWindow(): void {
   // A reloaded page has lost track of its sessions, so they cannot be
   // reached any more and would keep running unseen.
   created.webContents.on('did-start-navigation', (details) => {
-    if (details.isMainFrame && !details.isSameDocument) sessions.killAll()
+    if (!details.isMainFrame || details.isSameDocument) return
+    sessions.killAll()
+    pageReports = false
   })
 
   created.webContents.setWindowOpenHandler(({ url }) => {
@@ -219,16 +296,24 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.on('window-all-closed', () => app.quit())
-  app.on('will-quit', () => sessions.killAll())
+  app.on('will-quit', () => {
+    sessions.killAll()
+    bugLog.stop()
+  })
+
+  bugLog.start()
 
   void app.whenReady().then(() => {
-    const store = new StateStore(join(app.getPath('userData'), 'state.json'))
+    const store = new StateStore(join(app.getPath('userData'), 'state.json'), (error, backupPath) =>
+      bugLog.record({ kind: 'state-unreadable', ...describeProblem(error), detail: { backupPath } })
+    )
     registerIpc(store)
     Menu.setApplicationMenu(
       buildMenu({
         launchers: store.get().launchers,
         includeDeveloperTools: !app.isPackaged,
-        send: sendMenuCommand
+        send: sendMenuCommand,
+        showBugLog
       })
     )
     createWindow()

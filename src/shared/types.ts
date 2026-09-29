@@ -1,3 +1,5 @@
+import type { WindowReport } from './buglog'
+
 export interface Project {
   id: string
   name: string
@@ -40,6 +42,7 @@ export type MenuCommand =
   | { type: 'select-session'; index: number }
   | { type: 'clear' }
   | { type: 'add-project' }
+  | { type: 'report-bug' }
 
 export interface TelegraphApi {
   /** True when the app runs under the end-to-end tests. */
@@ -54,6 +57,10 @@ export interface TelegraphApi {
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   openExternal(url: string): void
+  /** Resolves to false when the report could not be saved. */
+  report(report: WindowReport): Promise<boolean>
+  /** Tells the main process that the page reports its own errors from here on. */
+  reporting(): void
   onSessionData(listener: (sessionId: string, data: string) => void): () => void
   onSessionExit(listener: (sessionId: string, exitCode: number) => void): () => void
   onMenuCommand(listener: (command: MenuCommand) => void): () => void

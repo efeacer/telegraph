@@ -566,3 +566,111 @@ button:focus-visible {
   gap: 8px;
   margin-top: 24px;
 }
+
+.failure {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  max-width: 640px;
+  padding: 0 0 10% 12%;
+  background: var(--well);
+}
+
+.failure h1 {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: 650;
+  font-stretch: 100%;
+  line-height: 1.25;
+}
+
+.failure p {
+  margin: 8px 0 0;
+  color: var(--slate);
+}
+
+/* Dialogs */
+
+.dialog {
+  width: min(520px, calc(100vw - 48px));
+  padding: 20px;
+  border: 1px solid var(--wire);
+  border-radius: 10px;
+  color: var(--paper);
+  background: var(--night-raised);
+  box-shadow: 0 24px 56px rgba(6, 11, 16, 0.6);
+}
+
+.dialog::backdrop {
+  background: rgba(6, 11, 16, 0.55);
+}
+
+.dialog h1 {
+  margin: 0 0 14px;
+  font-size: var(--text-heading);
+  font-weight: 650;
+  font-stretch: 100%;
+  line-height: 1.25;
+}
+
+.dialog label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.dialog textarea {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  max-height: 50vh;
+  padding: 8px 10px;
+  border: 1px solid var(--wire);
+  border-radius: 6px;
+  font: inherit;
+  line-height: 1.45;
+  color: var(--paper);
+  background: var(--well);
+  resize: vertical;
+  user-select: text;
+  cursor: text;
+}
+
+.dialog textarea::placeholder {
+  color: var(--slate);
+  opacity: 0.8;
+}
+
+.dialog textarea:focus-visible {
+  outline: 2px solid var(--glass);
+  outline-offset: -1px;
+}
+
+.dialog-hint,
+.dialog-error {
+  margin: 8px 0 0;
+  font-size: var(--text-small);
+  color: var(--slate);
+}
+
+.dialog-error {
+  color: var(--stop);
+  user-select: text;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.action-button:disabled {
+  color: var(--slate);
+  opacity: 0.6;
+}
+
+.action-button:disabled:hover {
+  border-color: var(--wire);
+  background: none;
+}

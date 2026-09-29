@@ -63,6 +63,20 @@ describe('StateStore', () => {
     expect(readFileSync(join(directory, 'nested', backups[0]!), 'utf8')).toBe('{ not json')
     log.mockRestore()
   })
+
+  it('tells when it has set an unreadable file aside', () => {
+    writeFileSync(join(directory, 'state.json'), '{ not json')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onUnreadable = vi.fn()
+
+    new StateStore(join(directory, 'state.json'), onUnreadable)
+
+    expect(onUnreadable).toHaveBeenCalledExactlyOnceWith(
+      expect.any(SyntaxError),
+      expect.stringContaining('state.json.unreadable-')
+    )
+    log.mockRestore()
+  })
 })
 
 describe('parseState', () => {

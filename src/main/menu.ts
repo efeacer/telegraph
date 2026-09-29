@@ -13,9 +13,11 @@ export interface MenuOptions {
   launchers: Launcher[]
   includeDeveloperTools: boolean
   send(command: MenuCommand): void
+  showBugLog(): void
 }
 
-export function buildMenu({ launchers, includeDeveloperTools, send }: MenuOptions): Menu {
+export function buildMenu(options: MenuOptions): Menu {
+  const { launchers, includeDeveloperTools, send, showBugLog } = options
   const startItems: MenuItemConstructorOptions[] = launchers.map((launcher) => ({
     label: `Start ${launcher.name}`,
     accelerator: LAUNCHER_SHORTCUTS[launcher.id],
@@ -86,6 +88,18 @@ export function buildMenu({ launchers, includeDeveloperTools, send }: MenuOption
     {
       role: 'window',
       submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }]
+    },
+    {
+      role: 'help',
+      submenu: [
+        {
+          id: 'report-bug',
+          label: 'Report a Bug…',
+          accelerator: 'CmdOrCtrl+Shift+B',
+          click: () => send({ type: 'report-bug' })
+        },
+        { label: 'Show Bug Log', click: showBugLog }
+      ]
     }
   ]
 
