@@ -15,13 +15,13 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     providers: ['anthropic'],
     // Names that stand for the latest model of a kind, so they do not go out of date.
     models: [
-      { id: 'fable', name: 'Fable, latest' },
-      { id: 'opus', name: 'Opus, latest' },
-      { id: 'sonnet', name: 'Sonnet, latest' },
-      { id: 'haiku', name: 'Haiku, latest' }
+      { id: 'fable', name: 'Latest Fable' },
+      { id: 'opus', name: 'Latest Opus' },
+      { id: 'sonnet', name: 'Latest Sonnet' },
+      { id: 'haiku', name: 'Latest Haiku' }
     ],
     modes: [
-      { id: 'continue', name: 'continue last chat', args: '--continue' },
+      { id: 'continue', name: 'continue the last chat', args: '--continue' },
       { id: 'resume', name: 'pick a chat to resume', args: '--resume' }
     ]
   },
@@ -33,7 +33,7 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     providers: ['openai'],
     models: [],
     modes: [
-      { id: 'continue', name: 'continue last chat', args: 'resume --last' },
+      { id: 'continue', name: 'continue the last chat', args: 'resume --last' },
       { id: 'resume', name: 'pick a chat to resume', args: 'resume' }
     ]
   },
@@ -44,11 +44,11 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     modelFlag: '--model',
     providers: ['google'],
     models: [
-      { id: 'pro', name: 'Pro, latest' },
-      { id: 'flash', name: 'Flash, latest' },
-      { id: 'flash-lite', name: 'Flash-Lite, latest' }
+      { id: 'pro', name: 'Latest Pro' },
+      { id: 'flash', name: 'Latest Flash' },
+      { id: 'flash-lite', name: 'Latest Flash-Lite' }
     ],
-    modes: [{ id: 'continue', name: 'continue last chat', args: '--resume latest' }]
+    modes: [{ id: 'continue', name: 'continue the last chat', args: '--resume latest' }]
   }
 ]
 

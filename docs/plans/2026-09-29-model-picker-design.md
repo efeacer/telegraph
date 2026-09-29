@@ -15,8 +15,8 @@ A launcher is a way to start a session. It gains three optional parts:
   "command": "claude",
   "modelFlag": "--model",
   "providers": ["anthropic"],
-  "models": [{ "id": "opus", "name": "Opus, latest" }],
-  "modes": [{ "id": "continue", "name": "continue last chat", "args": "--continue" }]
+  "models": [{ "id": "opus", "name": "Latest Opus" }],
+  "modes": [{ "id": "continue", "name": "continue the last chat", "args": "--continue" }]
 }
 ```
 
@@ -92,9 +92,9 @@ fill in, the way a telegram form has:
 ```
 No session open in signal-box
 
-Start  Claude ▾  on  Opus, latest ▾ ,  new chat ▾
+Claude ▾  on  Latest Opus ▾  to  continue the last chat ▾
 
-[ Start ]
+[ Start Claude ]
 ```
 
 Each blank opens a list. The blanks for the model and the mode are only there

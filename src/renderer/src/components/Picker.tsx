@@ -122,12 +122,12 @@ export function Picker({ project, launchers, catalogue, choice }: PickerProps) {
         )}
         {modes.length > 0 && (
           <>
-            <span className="picker-word picker-comma">,</span>
+            <span className="picker-word">to</span>
             <Select
               label="Chat"
               value={modeId}
               options={[
-                { value: NEW_CHAT, label: 'new chat' },
+                { value: NEW_CHAT, label: 'start a new chat' },
                 ...modes.map(({ id, name }) => ({ value: id, label: name }))
               ]}
               onChange={setModeId}

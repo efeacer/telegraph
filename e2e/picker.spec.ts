@@ -130,7 +130,7 @@ test('remembers what was chosen in the project', async () => {
   await expect(blank('Agent')).toHaveText('Parrot')
   await expect(blank('Model')).toHaveText('Swift 4')
   // Continuing a chat is a choice made each time.
-  await expect(blank('Chat')).toHaveText('new chat')
+  await expect(blank('Chat')).toHaveText('start a new chat')
   expect(savedState().choices).toEqual({
     'project-1': { launcherId: 'parrot', models: { parrot: 'swift-4' } }
   })
