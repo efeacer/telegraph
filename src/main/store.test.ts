@@ -149,9 +149,19 @@ describe('parseState', () => {
       modelFlag: '--model',
       providers: ['openai'],
       models: [{ id: 'gpt-6-sol', name: 'GPT-6 Sol' }],
-      modes: [{ id: 'restore', name: 'restore chat history', args: '--restore-chat-history' }]
+      modes: [{ id: 'restore', name: 'restore chat history', args: '--restore-chat-history' }],
+      chats: { kind: 'claude', flag: '--resume' }
     }
     expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([launcher])
+  })
+
+  it('drops a way of keeping chats it does not know', () => {
+    for (const chats of [{ kind: 'other', flag: '--resume' }, { kind: 'claude' }, 'claude', null]) {
+      const launcher = { id: 'a', name: 'A', command: 'a', chats }
+      expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([
+        { id: 'a', name: 'A', command: 'a' }
+      ])
+    }
   })
 
   it('drops the parts of a launcher it cannot read', () => {

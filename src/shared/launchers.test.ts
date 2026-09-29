@@ -47,6 +47,32 @@ describe('composeCommand', () => {
     )
   })
 
+  it('opens a chat that was had before', () => {
+    const remembering = { ...claude, chats: { kind: 'claude' as const, flag: '--resume' } }
+    const chatId = '11111111-1111-4111-8111-111111111111'
+    expect(composeCommand(remembering, { model: 'opus', modeId: null, chatId })).toBe(
+      "claude --model 'opus' --resume '11111111-1111-4111-8111-111111111111'"
+    )
+  })
+
+  it('opens the chat and leaves the mode be, when both are asked for', () => {
+    const remembering = { ...claude, chats: { kind: 'claude' as const, flag: '--resume' } }
+    expect(composeCommand(remembering, { model: null, modeId: 'continue', chatId: 'abc' })).toBe(
+      "claude --resume 'abc'"
+    )
+  })
+
+  it('opens no chat with a launcher that keeps none', () => {
+    expect(composeCommand(claude, { model: null, modeId: null, chatId: 'abc' })).toBe('claude')
+  })
+
+  it('keeps a chat from being read as a command', () => {
+    const remembering = { ...claude, chats: { kind: 'claude' as const, flag: '--resume' } }
+    expect(composeCommand(remembering, { model: null, modeId: null, chatId: 'x; rm -rf ~' })).toBe(
+      "claude --resume 'x; rm -rf ~'"
+    )
+  })
+
   it('passes no model to a launcher that cannot take one', () => {
     const greeter: Launcher = { id: 'greeter', name: 'Greeter', command: 'echo hello' }
     expect(composeCommand(greeter, { model: 'opus', modeId: null })).toBe('echo hello')
@@ -114,6 +140,11 @@ describe('the launchers Telegraph comes with', () => {
   it('have ids of their own', () => {
     const ids = DEFAULT_LAUNCHERS.map((launcher) => launcher.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('know how Claude keeps its chats', () => {
+    const claudeLauncher = DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'claude')
+    expect(claudeLauncher?.chats).toEqual({ kind: 'claude', flag: '--resume' })
   })
 
   it('name a provider wherever a model can be chosen', () => {

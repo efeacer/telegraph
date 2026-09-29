@@ -22,6 +22,22 @@ export interface Mode {
   args: string
 }
 
+/** How a program keeps the chats it has had, by which Telegraph can offer them again. */
+export interface ChatRecords {
+  /** Whose way of keeping chats it is. That of Claude Code is the one Telegraph can read. */
+  kind: 'claude'
+  /** Goes before the chat on the command line. */
+  flag: string
+}
+
+/** A chat that was had before and can be opened again. */
+export interface Chat {
+  id: string
+  title: string
+  /** When the chat last went on. */
+  at: string
+}
+
 /** A way to start a session. A null command starts a plain shell. */
 export interface Launcher {
   id: string
@@ -34,6 +50,7 @@ export interface Launcher {
   /** Models offered first, and the only ones offered without the catalogue. */
   models?: Model[]
   modes?: Mode[]
+  chats?: ChatRecords
 }
 
 /** The models of each provider, newest first. */
@@ -43,6 +60,8 @@ export type Catalogue = Record<string, Model[]>
 export interface Start {
   model: string | null
   modeId: string | null
+  /** A chat that was had before, to go on with. Takes the place of the mode. */
+  chatId?: string | null
 }
 
 /** What was last chosen in a project. */

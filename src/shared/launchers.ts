@@ -25,7 +25,8 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     modes: [
       { id: 'continue', name: 'continue the last chat', args: '--continue' },
       { id: 'resume', name: 'pick a chat to resume', args: '--resume' }
-    ]
+    ],
+    chats: { kind: 'claude', flag: '--resume' }
   },
   {
     id: 'codex',
@@ -69,8 +70,10 @@ export function composeCommand(launcher: Launcher, start: Start): string | null 
   const parts = [launcher.command]
   const model = start.model?.trim()
   if (launcher.modelFlag && model) parts.push(launcher.modelFlag, quote(model))
+  const chatId = start.chatId?.trim()
   const mode = launcher.modes?.find((candidate) => candidate.id === start.modeId)
-  if (mode) parts.push(mode.args)
+  if (launcher.chats && chatId) parts.push(launcher.chats.flag, quote(chatId))
+  else if (mode) parts.push(mode.args)
   return parts.join(' ')
 }
 
