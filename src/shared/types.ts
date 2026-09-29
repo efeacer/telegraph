@@ -61,6 +61,8 @@ export interface GitStatus {
 export interface PersistedState {
   projects: Project[]
   launchers: Launcher[]
+  /** What was last chosen in each project, by the id of the project. */
+  choices: Record<string, Choice>
 }
 
 export interface CreateSessionRequest {

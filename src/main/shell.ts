@@ -59,12 +59,17 @@ export function buildShellInvocation(
 
   // The wrapper script is POSIX syntax, so shells like fish only take over
   // once the command has finished.
-  const runner = POSIX_SHELLS.has(shellName(shell)) ? shell : FALLBACK_SHELL
   return {
-    file: runner,
+    file: posixShell(shell),
     args: ['-l', '-i', '-c', RUN_THEN_SHELL],
     env: { ...sessionEnv, [COMMAND_VARIABLE]: command }
   }
+}
+
+/** The user's shell if it reads POSIX syntax, and one that does otherwise. */
+export function posixShell(userShell: string | undefined): string {
+  const shell = userShell || FALLBACK_SHELL
+  return POSIX_SHELLS.has(shellName(shell)) ? shell : FALLBACK_SHELL
 }
 
 /** Name of a shell as it appears in a process list, where login shells start with a dash. */
