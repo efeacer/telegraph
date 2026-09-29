@@ -6,11 +6,50 @@ export interface Project {
   path: string
 }
 
+export interface Model {
+  /** What the program is told to run. */
+  id: string
+  name: string
+  /** The day the model came out, where the catalogue says so. */
+  releasedAt?: string
+}
+
+/** Another way to start a launcher than with a new chat, such as continuing the last one. */
+export interface Mode {
+  id: string
+  name: string
+  /** Added to the end of the command. */
+  args: string
+}
+
 /** A way to start a session. A null command starts a plain shell. */
 export interface Launcher {
   id: string
   name: string
   command: string | null
+  /** Goes before the model on the command line. Without it there is no model to choose. */
+  modelFlag?: string
+  /** The providers in the catalogue whose models the program runs. */
+  providers?: string[]
+  /** Models offered first, and the only ones offered without the catalogue. */
+  models?: Model[]
+  modes?: Mode[]
+}
+
+/** The models of each provider, newest first. */
+export type Catalogue = Record<string, Model[]>
+
+/** How to start a launcher. Null stands for the usual model and for a new chat. */
+export interface Start {
+  model: string | null
+  modeId: string | null
+}
+
+/** What was last chosen in a project. */
+export interface Choice {
+  launcherId: string
+  /** The model last chosen for each launcher. */
+  models: Record<string, string>
 }
 
 export interface GitStatus {
