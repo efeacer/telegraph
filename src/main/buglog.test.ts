@@ -162,8 +162,8 @@ describe('fingerprintOf', () => {
     ].join('\n')
 
   it('is the same wherever the code has moved to', () => {
-    const before = { kind: 'window-error', message: 'TypeError: nothing to read', stack: stack(180) }
-    const after = { kind: 'window-error', message: 'TypeError: nothing to read', stack: stack(212) }
+    const before = { kind: 'window-error' as const, message: 'TypeError: nothing to read', stack: stack(180) }
+    const after = { kind: 'window-error' as const, message: 'TypeError: nothing to read', stack: stack(212) }
     expect(fingerprintOf(after)).toBe(fingerprintOf(before))
   })
 
