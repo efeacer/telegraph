@@ -17,6 +17,7 @@ import {
 import { checkWindowReport, describeProblem, type LogEntry } from '@shared/buglog'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
+import { Attachments } from './attachments'
 import { BugLog } from './buglog'
 import { ModelCatalogue } from './catalogue'
 import { readGitStatus } from './git'
@@ -59,6 +60,10 @@ const bugLog = new BugLog({
   }
 })
 watchProcess(bugLog, { onNewError: showError })
+
+const attachments = new Attachments({
+  directory: join(app.getPath('temp'), 'telegraph-attachments')
+})
 
 let window: BrowserWindow | null = null
 let quitConfirmed = false
@@ -171,6 +176,8 @@ function registerIpc(
   )
 
   listen(IPC.openExternal, (url: string) => openInBrowser(url))
+
+  handle(IPC.saveAttachment, (type: unknown, data: unknown) => attachments.save(type, data))
 
   handle(IPC.report, (report: unknown) => {
     const checked = checkWindowReport(report)
@@ -327,6 +334,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   bugLog.start()
+  attachments.clearOld()
 
   void app.whenReady().then(() => {
     const store = new StateStore(join(app.getPath('userData'), 'state.json'), (error, backupPath) =>

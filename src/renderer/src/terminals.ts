@@ -18,6 +18,8 @@ export interface TerminalHandlers {
   onBell(): void
   onTitle(title: string): void
   onLink(url: string): void
+  /** Files were dropped on the terminal, or pasted into it. */
+  onFiles(files: File[]): void
 }
 
 interface TerminalView {
@@ -81,6 +83,10 @@ export class TerminalManager {
     fit.fit()
 
     terminal.attachCustomKeyEventHandler((event) => handleKey(event, handlers.onInput))
+    takeFiles(element, (files) => {
+      terminal.focus()
+      handlers.onFiles(files)
+    })
     terminal.onData(handlers.onInput)
     terminal.onResize(({ cols, rows }) => handlers.onResize(cols, rows))
     terminal.onBell(handlers.onBell)
@@ -99,6 +105,11 @@ export class TerminalManager {
 
   write(sessionId: string, data: string): void {
     this.views.get(sessionId)?.terminal.write(data)
+  }
+
+  /** Types text the way pasting does, which tells the program that it was not typed. */
+  paste(sessionId: string, text: string): void {
+    this.views.get(sessionId)?.terminal.paste(text)
   }
 
   clear(sessionId: string): void {
@@ -137,6 +148,41 @@ function loadGpuRenderer(terminal: Terminal): void {
   } catch {
     // No GPU available, the built-in renderer is already in place.
   }
+}
+
+/**
+ * Hands over the files that are dropped on the element or pasted into it. The
+ * terminal itself only knows what to do with text.
+ */
+function takeFiles(element: HTMLElement, take: (files: File[]) => void): void {
+  const holdsFiles = (transfer: DataTransfer | null): transfer is DataTransfer =>
+    transfer !== null && transfer.types.includes('Files')
+
+  // Heard on the way down to the terminal, which would otherwise paste nothing.
+  element.addEventListener(
+    'paste',
+    (event) => {
+      const files = [...(event.clipboardData?.files ?? [])]
+      if (files.length === 0) return
+      event.preventDefault()
+      event.stopPropagation()
+      take(files)
+    },
+    true
+  )
+
+  // Saying that the files are welcome is what makes the drop happen.
+  element.addEventListener('dragover', (event) => {
+    if (!holdsFiles(event.dataTransfer)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  })
+
+  element.addEventListener('drop', (event) => {
+    if (!holdsFiles(event.dataTransfer)) return
+    event.preventDefault()
+    take([...event.dataTransfer.files])
+  })
 }
 
 /** Returns false for keys Telegraph handles itself, which stops the terminal from handling them too. */

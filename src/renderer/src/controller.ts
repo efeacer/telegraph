@@ -1,5 +1,6 @@
 import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
+import { escapePath } from '@shared/paths'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
 import type { Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
@@ -155,7 +156,8 @@ export async function startSession(
     onResize: (cols, rows) => api.resize(sessionId, cols, rows),
     onBell: () => track(sessionId, { type: 'bell', focused: isWatched(sessionId) }),
     onTitle: (title) => updateSession(sessionId, { title: title.trim() || null }),
-    onLink: (url) => api.openExternal(url)
+    onLink: (url) => api.openExternal(url),
+    onFiles: (files) => void attach(sessionId, files)
   })
 
   statuses.set(sessionId, initialStatus())
@@ -182,6 +184,30 @@ export async function startSession(
     setState((state) => ({
       ...state,
       error: `Could not start ${launcher.name} in ${project.name}. ${result.error}.`
+    }))
+  }
+}
+
+/**
+ * Hands files to the program in a session the way a terminal does: by typing
+ * where they are. A pasted image is nowhere yet, and is kept as a file first.
+ */
+async function attach(sessionId: string, files: File[]): Promise<void> {
+  const paths: string[] = []
+  const refused: string[] = []
+  for (const file of files) {
+    const path = api.pathOf(file) || (await api.saveAttachment(file.type, await file.arrayBuffer()))
+    const typed = path ? escapePath(path) : null
+    if (typed) paths.push(typed)
+    else refused.push(file.name)
+  }
+
+  // With a space after each, so that what is typed next does not join the path.
+  if (paths.length > 0) terminals.paste(sessionId, paths.map((path) => `${path} `).join(''))
+  if (refused.length > 0) {
+    setState((state) => ({
+      ...state,
+      error: `Could not attach ${refused.join(', ')}. Only images can be pasted: a file of another kind has to be dropped, or copied as a file.`
     }))
   }
 }

@@ -43,6 +43,13 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Attaching files
+
+Drop a file on a session, or paste one, and Telegraph types its path for the
+program that is running. A screenshot that was copied is kept as a file
+first. Ctrl+V goes to the program itself, which is how Claude Code looks at
+the clipboard.
+
 ## Bug log
 
 Telegraph records its crashes and errors in `logs/bugs.jsonl` in its user data

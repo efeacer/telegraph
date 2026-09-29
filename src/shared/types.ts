@@ -103,6 +103,10 @@ export interface TelegraphApi {
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   openExternal(url: string): void
+  /** Where a file is that was dropped or pasted. Empty for one that is nowhere, like an image on the clipboard. */
+  pathOf(file: File): string
+  /** Keeps a pasted image as a file. Resolves to where it is, or to null if it was not kept. */
+  saveAttachment(type: string, data: ArrayBuffer): Promise<string | null>
   /** Resolves to false when the report was not saved. */
   report(report: WindowReport): Promise<boolean>
   /** Tells the main process that the page reports its own errors from here on. */

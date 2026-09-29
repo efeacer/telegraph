@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { TelegraphApi } from '@shared/types'
 
@@ -25,6 +25,8 @@ const api: TelegraphApi = {
   write: (sessionId, data) => ipcRenderer.send(IPC.write, sessionId, data),
   resize: (sessionId, cols, rows) => ipcRenderer.send(IPC.resize, sessionId, cols, rows),
   openExternal: (url) => ipcRenderer.send(IPC.openExternal, url),
+  pathOf: (file) => webUtils.getPathForFile(file),
+  saveAttachment: (type, data) => ipcRenderer.invoke(IPC.saveAttachment, type, data),
   report: (report) => ipcRenderer.invoke(IPC.report, report),
   reporting: () => ipcRenderer.send(IPC.reporting),
   onSessionData: (listener) => subscribe(IPC.sessionData, listener),
