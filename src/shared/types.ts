@@ -6,6 +6,20 @@ export interface Project {
   id: string
   name: string
   path: string
+  /** The companion's own place, which Telegraph keeps and the user cannot remove. */
+  companion?: boolean
+}
+
+/** What the window tells the companion of its sessions. */
+export interface SessionSnapshot {
+  sessions: { label: string; project: string; status: string; model: string | null }[]
+}
+
+/** A connector the agents can reach: of the user's Claude account, or set up in Claude Code. */
+export interface Connection {
+  name: string
+  account: boolean
+  reachable: boolean
 }
 
 export interface Model {
