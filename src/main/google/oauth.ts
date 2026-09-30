@@ -26,8 +26,9 @@ export function authUrl(options: {
   challenge: string
   state: string
   scopes: string[]
+  endpoint?: string
 }): string {
-  const url = new URL(AUTH_ENDPOINT)
+  const url = new URL(options.endpoint ?? AUTH_ENDPOINT)
   url.search = new URLSearchParams({
     client_id: options.clientId,
     redirect_uri: options.redirectUri,
