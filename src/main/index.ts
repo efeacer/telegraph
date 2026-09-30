@@ -490,6 +490,19 @@ function registerIpc(
 
   handle(IPC.removeProject, (projectId: string) => store.removeProject(projectId))
 
+  // Found by the project: the window names a project, never a path to open.
+  listen(IPC.openFolder, (projectId: unknown) => {
+    const project = projectsOf().find((candidate) => candidate.id === projectId)
+    if (!project) return
+    if (isE2E) {
+      // Under test the folder is kept, and no window of the system is opened on the user's desktop.
+      const opened = ((globalThis as Record<string, unknown>).telegraphOpenedFolders ??= []) as string[]
+      opened.push(project.path)
+      return
+    }
+    void shell.openPath(project.path)
+  })
+
   handle(IPC.gitStatus, (projectPath: string) => readGitStatus(projectPath))
 
   handle(IPC.createSession, (request: CreateSessionRequest): CreateSessionResult => {

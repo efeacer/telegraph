@@ -43,6 +43,11 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Opening a project's folder
+
+The folder icon beside a project opens its folder in Finder (File Explorer on
+Windows).
+
 ## Pause, stop and end
 
 Every session has a pause button, which freezes it where it is until you

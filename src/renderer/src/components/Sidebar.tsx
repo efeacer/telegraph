@@ -59,6 +59,13 @@ export function Sidebar({ state }: { state: AppState }) {
   )
 }
 
+/** What the file manager of the system is called, which the user knows it by. */
+const FILE_MANAGER = navigator.userAgent.includes('Windows')
+  ? 'File Explorer'
+  : navigator.userAgent.includes('Mac')
+    ? 'Finder'
+    : 'Files'
+
 /** What the companion knows of the day, under its name. Pressed, it shows what it is connected to. */
 function NextMeeting({ agenda }: { agenda: AgendaState | null }) {
   const now = Date.now()
@@ -119,6 +126,15 @@ function ProjectGroup(props: ProjectGroupProps) {
             )}
           </span>
           {git && <span className="project-branch">{describeGit(git)}</span>}
+        </button>
+        <button
+          type="button"
+          className="icon-button project-folder"
+          aria-label={`Open ${project.name} in ${FILE_MANAGER}`}
+          title={`Open the folder of ${project.name} in ${FILE_MANAGER}`}
+          onClick={() => window.telegraph.openFolder(project.id)}
+        >
+          <Icon name="folder" size={14} />
         </button>
         <ProjectMenu project={project} launchers={launchers} hasSessions={sessions.length > 0} />
       </div>

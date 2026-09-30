@@ -2,6 +2,7 @@ export const IPC = {
   loadState: 'state:load',
   addProject: 'projects:add',
   removeProject: 'projects:remove',
+  openFolder: 'projects:open-folder',
   installedLaunchers: 'launchers:installed',
   loadCatalogue: 'models:load',
   saveChoice: 'choices:save',

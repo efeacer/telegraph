@@ -224,6 +224,8 @@ export interface TelegraphApi {
   loadState(): Promise<PersistedState>
   addProject(): Promise<Project | null>
   removeProject(projectId: string): Promise<void>
+  /** Opens the folder of a project in Finder, File Explorer or the file manager of the system. */
+  openFolder(projectId: string): void
   /** The ids of the launchers whose program is installed. */
   installedLaunchers(): Promise<string[]>
   /** The models of each provider. Empty when the list could not be had. */

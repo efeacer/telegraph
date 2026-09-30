@@ -20,6 +20,7 @@ const api: TelegraphApi = {
   loadState: () => ipcRenderer.invoke(IPC.loadState),
   addProject: () => ipcRenderer.invoke(IPC.addProject),
   removeProject: (projectId) => ipcRenderer.invoke(IPC.removeProject, projectId),
+  openFolder: (projectId) => ipcRenderer.send(IPC.openFolder, projectId),
   installedLaunchers: () => ipcRenderer.invoke(IPC.installedLaunchers),
   loadCatalogue: () => ipcRenderer.invoke(IPC.loadCatalogue),
   saveChoice: (projectId, choice) => ipcRenderer.send(IPC.saveChoice, projectId, choice),
