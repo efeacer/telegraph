@@ -1,7 +1,16 @@
 import { useSyncExternalStore } from 'react'
 import type { SessionStatus } from '@shared/status'
 import type { ThemeName } from '@shared/themes'
-import type { Catalogue, Choice, GitStatus, Launcher, Model, Project, Usage } from '@shared/types'
+import type {
+  AgendaState,
+  Catalogue,
+  Choice,
+  GitStatus,
+  Launcher,
+  Model,
+  Project,
+  Usage
+} from '@shared/types'
 
 export interface SessionView {
   id: string
@@ -51,6 +60,9 @@ export interface AppState {
   git: Record<string, GitStatus | null>
   /** What the agents have used. Null until it was read. */
   usage: Usage | null
+  /** The meetings of the user, as far as Telegraph knows them. Null until it was read. */
+  agenda: AgendaState | null
+  connectionsOpen: boolean
   sessions: SessionView[]
   activeSessionId: string | null
   selectedProjectId: string | null
@@ -71,6 +83,8 @@ let state: AppState = {
   choices: {},
   git: {},
   usage: null,
+  agenda: null,
+  connectionsOpen: false,
   sessions: [],
   activeSessionId: null,
   selectedProjectId: null,

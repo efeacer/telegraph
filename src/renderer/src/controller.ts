@@ -11,7 +11,7 @@ import {
   type StatusEvent,
   type StatusState
 } from '@shared/status'
-import type { Chat, Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
+import type { Chat, Choice, Launcher, MenuCommand, Model, SessionSnapshot, Start } from '@shared/types'
 import { report } from './problems'
 import {
   getState,
@@ -37,11 +37,20 @@ const terminals = new TerminalManager({ useGpu: !api.e2e, theme: api.theme })
 const statuses = new Map<string, StatusState>()
 /** Sessions into which something has been typed and not yet sent. */
 const drafting = new Set<string>()
-/** Names to tell the agents of, once they can be typed to. */
-const pendingNames = new Map<string, string>()
+/** Lines to type into sessions, each once the session can be typed to. */
+const pendingLines = new Map<string, string[]>()
+const COMPANION_ID = 'companion'
+let lastSnapshot = ''
 
 // From the start: the theme can be chosen in the menu before the window has drawn anything.
 api.onThemeChanged(showTheme)
+// From the start too: a meeting that is near is offered as soon as Telegraph opens.
+api.onAskCompanion((prompt) => void askCompanion(prompt))
+
+/** Settled once the projects and launchers are known, which starting a session needs. */
+let markReady: () => void = () => {}
+const ready = new Promise<void>((resolve) => (markReady = resolve))
+let companionStarting: Promise<string | null> | null = null
 
 export function attachTerminalHost(host: HTMLElement): void {
   terminals.attach(host)
@@ -85,6 +94,7 @@ export async function initialize(): Promise<void> {
   api.onProblem((message) => setState((state) => ({ ...state, error: message })))
   api.onUsageChanged(() => void refreshUsage())
   api.onOpenSession(activateSession)
+  api.onAgendaChanged((agenda) => setState((state) => ({ ...state, agenda })))
 
   const persisted = await api.loadState()
   // Null when it cannot be told, in which case every launcher is offered.
@@ -102,8 +112,15 @@ export async function initialize(): Promise<void> {
     projects: persisted.projects,
     launchers: persisted.launchers.filter(offer(installed)),
     choices: persisted.choices,
-    selectedProjectId: persisted.projects[0]?.id ?? null
+    // The companion is at hand in the sidebar. What is shown first is the user's own work.
+    selectedProjectId: persisted.projects.find((project) => !project.companion)?.id ?? null
   }))
+  void api
+    .readAgenda()
+    .then((agenda) => setState((state) => ({ ...state, agenda: state.agenda ?? agenda })))
+    .catch(() => {})
+  markReady()
+  void startCompanion()
   if (installed === null) {
     void detection.then((ids) =>
       setState((state) => ({ ...state, launchers: state.launchers.filter(offer(ids)) }))
@@ -192,12 +209,14 @@ export function selectProject(projectId: string): void {
 export async function startSession(
   projectId: string,
   launcherId: string,
-  start: Partial<Start> = {}
-): Promise<void> {
+  start: Partial<Start> = {},
+  /** Started without being brought to the front, as the companion is at start. */
+  quietly = false
+): Promise<string | null> {
   const current = getState()
   const project = current.projects.find((candidate) => candidate.id === projectId)
   const launcher = current.launchers.find((candidate) => candidate.id === launcherId)
-  if (!project || !launcher) return
+  if (!project || !launcher) return null
 
   const remembered = current.choices[projectId]?.models[launcherId] ?? null
   const chosen = (start.model === undefined ? remembered : start.model)?.trim() || null
@@ -239,7 +258,7 @@ export async function startSession(
     unread: false
   }
   setState((state) => ({ ...state, sessions: [...state.sessions, session], error: null }))
-  activateSession(sessionId)
+  if (!quietly) activateSession(sessionId)
 
   const result = await api.createSession({
     sessionId,
@@ -259,7 +278,73 @@ export async function startSession(
       ...state,
       error: `Could not start ${launcher.name} in ${project.name}. ${result.error}.`
     }))
+    return null
   }
+  return sessionId
+}
+
+/**
+ * Starts the companion, an agent that is always there: it goes on with the
+ * chat it had before, so that it knows what was said. Claude, where it is
+ * installed; nothing otherwise.
+ */
+function startCompanion(): Promise<string | null> {
+  // Asked for twice at once, as at start while a meeting is offered, it is started once.
+  companionStarting ??= launchCompanion().finally(() => {
+    companionStarting = null
+  })
+  return companionStarting
+}
+
+async function launchCompanion(): Promise<string | null> {
+  await ready
+  const state = getState()
+  const running = state.sessions.find((session) => session.projectId === COMPANION_ID && session.status !== 'exited')
+  if (running) return running.id
+  if (!state.launchers.some((launcher) => launcher.id === 'claude')) return null
+  const chats = await listChats(COMPANION_ID, 'claude')
+  return startSession(COMPANION_ID, 'claude', { modeId: chats.length > 0 ? 'continue' : null }, true)
+}
+
+/** Asks the companion something, bringing it to the front: the user asked for its help. */
+export async function askCompanion(line: string): Promise<void> {
+  const sessionId = await startCompanion()
+  if (!sessionId) {
+    setState((state) => ({ ...state, error: 'The companion needs Claude, which could not be found.' }))
+    return
+  }
+  activateSession(sessionId)
+  typeWhenSettled(sessionId, line)
+}
+
+export function openConnections(): void {
+  setState((state) => ({ ...state, connectionsOpen: true }))
+}
+
+export function closeConnections(): void {
+  setState((state) => ({ ...state, connectionsOpen: false }))
+  focusActive()
+}
+
+export function refreshAgenda(): void {
+  api.refreshAgenda()
+}
+
+/** Tells the companion what the sessions are doing, when that has changed. */
+function sendSnapshot(): void {
+  const state = getState()
+  const snapshot: SessionSnapshot = {
+    sessions: state.sessions.map((session) => ({
+      label: sessionLabel(session),
+      project: state.projects.find((project) => project.id === session.projectId)?.name ?? '',
+      status: session.status,
+      model: session.model?.name ?? null
+    }))
+  }
+  const text = JSON.stringify(snapshot)
+  if (text === lastSnapshot) return
+  lastSnapshot = text
+  api.sendSnapshot(snapshot)
 }
 
 /**
@@ -353,27 +438,35 @@ export function finishRenaming(sessionId: string, text: string | null): void {
   updateSession(sessionId, { name })
   // The agent keeps the name in its own record of the chat, and so it outlives the session.
   const launcher = getState().launchers.find((candidate) => candidate.id === session.launcherId)
-  if (name && launcher?.renameCommand) {
-    pendingNames.set(sessionId, name)
-    tellName(sessionId, performance.now())
-  }
+  if (name && launcher?.renameCommand) typeWhenSettled(sessionId, `${launcher.renameCommand} ${name}`)
+}
+
+/** Types a line into a session, and Enter, once that cannot go wrong. */
+function typeWhenSettled(sessionId: string, line: string): void {
+  pendingLines.set(sessionId, [...(pendingLines.get(sessionId) ?? []), line])
+  typePending(sessionId, performance.now())
 }
 
 /**
- * Types the name into the session, once that cannot go wrong: not while the
- * agent works or has just been sent something, nor while something is typed.
+ * Types what waits for a session, once that cannot go wrong: not while the
+ * agent works, starts or has just been sent something, nor while something
+ * is typed and not sent.
  */
-function tellName(sessionId: string, at: number): void {
-  const name = pendingNames.get(sessionId)
+function typePending(sessionId: string, at: number): void {
+  const lines = pendingLines.get(sessionId)
   const status = statuses.get(sessionId)
-  const session = getState().sessions.find((candidate) => candidate.id === sessionId)
-  const launcher = getState().launchers.find((candidate) => candidate.id === session?.launcherId)
-  if (!name || !status || !session || !launcher?.renameCommand) return pendingNames.delete(sessionId), undefined
-  if (status.status === 'exited') return pendingNames.delete(sessionId), undefined
-  const settled = at - status.lastInputAt > QUIET_MS && status.burstStartedAt === null
+  if (!lines || lines.length === 0 || !status || status.status === 'exited') {
+    pendingLines.delete(sessionId)
+    return
+  }
+  const settled = at - status.lastInputAt > QUIET_MS && at - status.lastOutputAt > QUIET_MS
   if (status.status === 'working' || !settled || drafting.has(sessionId)) return
-  pendingNames.delete(sessionId)
-  api.write(sessionId, `${launcher.renameCommand} ${name}\r`)
+  pendingLines.delete(sessionId)
+  // One at a time: each is answered before the next is typed.
+  const [line, ...rest] = lines
+  api.write(sessionId, `${line}\r`)
+  track(sessionId, { type: 'input', at })
+  if (rest.length > 0) pendingLines.set(sessionId, rest)
 }
 
 function remember(projectId: string, launcherId: string, modelId: string | null): void {
@@ -440,7 +533,7 @@ export function saveBugReport(note: string): Promise<boolean> {
     kind: 'bug-report',
     message: note,
     detail: {
-      projects: projects.length,
+      projects: projects.filter((project) => !project.companion).length,
       sessions: sessions.map((session) => ({
         launcher: session.launcherName,
         model: session.model?.id ?? null,
@@ -460,7 +553,7 @@ function discardSession(sessionId: string): void {
   terminals.dispose(sessionId)
   statuses.delete(sessionId)
   drafting.delete(sessionId)
-  pendingNames.delete(sessionId)
+  pendingLines.delete(sessionId)
   setState((state) => ({
     ...state,
     sessions: state.sessions.filter((session) => session.id !== sessionId),
@@ -549,7 +642,8 @@ function tick(): void {
   for (const sessionId of statuses.keys()) {
     track(sessionId, { type: 'tick', at, focused: isWatched(sessionId) })
   }
-  for (const sessionId of pendingNames.keys()) tellName(sessionId, at)
+  for (const sessionId of pendingLines.keys()) typePending(sessionId, at)
+  sendSnapshot()
 }
 
 export async function refreshUsage(): Promise<void> {

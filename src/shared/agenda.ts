@@ -49,7 +49,9 @@ function readMeeting(value: unknown): Meeting[] {
  */
 export function parseAgenda(answer: string): AgendaReading {
   const unavailable = /EVENTS:\s*UNAVAILABLE\b(.*)/.exec(answer)
-  if (unavailable) return { status: 'unavailable', reason: line(unavailable[1], REASON_LENGTH) }
+  if (unavailable) {
+    return { status: 'unavailable', reason: line(unavailable[1], REASON_LENGTH).replace(/^[-–:\s]+/, '') }
+  }
   const listed = /EVENTS:\s*(\[.*\])/s.exec(answer)
   if (!listed) return { status: 'unreadable' }
   let items: unknown

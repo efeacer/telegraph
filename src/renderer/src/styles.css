@@ -1529,3 +1529,95 @@ button:focus-visible {
   font-size: var(--text-body);
   margin: 0;
 }
+
+/*
+ * The companion
+ *
+ * First in the sidebar, set apart from the projects by a line, with what it
+ * knows of the day under its name.
+ */
+
+.project.is-companion {
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--wire-faint);
+}
+
+.project.is-companion + .project {
+  margin-top: 0;
+}
+
+.companion-next {
+  display: block;
+  width: calc(100% - 12px);
+  margin: -2px 0 4px 12px;
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-small);
+  text-align: left;
+  color: var(--slate);
+}
+
+.companion-next:hover {
+  color: var(--paper);
+}
+
+.companion-next.needs-attention {
+  color: var(--brass);
+}
+
+.connections h2 {
+  margin: 18px 0 4px;
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.connections p {
+  margin: 4px 0 0;
+}
+
+.connections-calendar {
+  user-select: text;
+}
+
+.connections-calendar[data-status='unavailable'],
+.connections-calendar[data-status='failed'] {
+  color: var(--brass);
+}
+
+.connections-actions {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.connections-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connections-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--wire-faint);
+}
+
+.connections-state {
+  font-size: var(--text-small);
+  color: var(--glass);
+}
+
+.connections-list li[data-reachable='false'] .connections-state {
+  color: var(--brass);
+}
+
+.link-button {
+  font-size: inherit;
+  color: var(--glass);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

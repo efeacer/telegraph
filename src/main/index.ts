@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { release } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -19,11 +20,22 @@ import {
 import { checkWindowReport, describeProblem, type LogEntry } from '@shared/buglog'
 import { DEFAULT_THEME, THEMES, type ThemeName } from '@shared/themes'
 import { withReporting } from '@shared/usage'
+import { nudgePrompt, type Meeting } from '@shared/agenda'
+import type { SessionSnapshot } from '@shared/types'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
 import { Attachments } from './attachments'
 import { BugLog } from './buglog'
+import { AgendaWatcher, askClaudeForAgenda } from './agenda'
 import { ModelCatalogue } from './catalogue'
+import {
+  checkSnapshot,
+  companionProject,
+  parseConnections,
+  renderContext,
+  writeBriefing,
+  writeContext
+} from './companion'
 import { listChats } from './chats'
 import { readGitStatus } from './git'
 import { findInstalled } from './installed'
@@ -32,7 +44,7 @@ import { Meters, hasOwnStatusLine } from './meters'
 import { Notifier, type NotifierTools } from './notifier'
 import { buildMenu } from './menu'
 import { PtyManager } from './pty'
-import { buildSessionEnv } from './shell'
+import { buildSessionEnv, posixShell } from './shell'
 import { StateStore } from './store'
 import { watchProcess, watchWindow } from './watch'
 
@@ -136,14 +148,98 @@ function recordedNotices(): NotifierTools {
 }
 
 const notifier = new Notifier(isE2E ? recordedNotices() : systemNotices, (sessionId) => {
-  // Brought to the front, which under test would take the keys from the user.
-  if (window && !isE2E) {
-    if (window.isMinimized()) window.restore()
-    window.show()
-    window.focus()
-  }
+  bringForward()
   send(IPC.openSession, sessionId)
 })
+
+/** Brings the window to the front, which under test would take the keys from the user. */
+function bringForward(): void {
+  if (!window || isE2E) return
+  if (window.isMinimized()) window.restore()
+  window.show()
+  window.focus()
+}
+
+// The companion: a chat of its own in a folder of its own, told of the day.
+const companionDir = join(app.getPath('userData'), 'companion')
+const HOUR_MS = 60 * 60_000
+const MINUTE_MS = 60_000
+let snapshot: SessionSnapshot = { sessions: [] }
+
+/** Under test, what Claude would answer is in a file of the test, and Claude is never asked. */
+function fromTestFile(name: string, otherwise: string): () => Promise<string> {
+  return async () => {
+    try {
+      return readFileSync(join(app.getPath('userData'), name), 'utf8')
+    } catch {
+      return otherwise
+    }
+  }
+}
+
+const agenda = new AgendaWatcher({
+  filePath: join(app.getPath('userData'), 'agenda.json'),
+  fetch: isE2E
+    ? fromTestFile('test-agenda.txt', 'EVENTS: []')
+    : askClaudeForAgenda({
+        shell: posixShell(process.env.SHELL),
+        cwd: companionDir,
+        env: buildSessionEnv(process.env, app.getVersion())
+      }),
+  onChange: (state) => {
+    send(IPC.agendaChanged, state)
+    updateContext()
+  },
+  onNudge: offerHelp
+})
+
+function clockOf(time: string): string {
+  const at = new Date(time)
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+}
+
+/** Offers help with a meeting that is near. Taken up, the companion is asked. */
+function offerHelp(meeting: Meeting): void {
+  const minutes = Math.max(1, Math.round((Date.parse(meeting.start) - Date.now()) / MINUTE_MS))
+  const clock = clockOf(meeting.start)
+  notifier.offer(
+    `meeting ${meeting.id}`,
+    {
+      title: `“${meeting.title}” in ${minutes} minutes`,
+      body: `At ${clock}. Want help preparing? Press to ask your companion.`
+    },
+    () => {
+      bringForward()
+      askWhenLoaded(nudgePrompt(meeting, `at ${clock}`))
+    }
+  )
+}
+
+// What the companion is to be asked, held while the page is loading and cannot hear it.
+let pageLoaded = false
+const heldAsks: string[] = []
+
+function askWhenLoaded(prompt: string): void {
+  if (pageLoaded) send(IPC.askCompanion, prompt)
+  else heldAsks.push(prompt)
+}
+
+function updateContext(): void {
+  writeContext(companionDir, renderContext({ now: new Date(), agenda: agenda.state(), snapshot }))
+}
+
+/** The connectors the agents can reach, as Claude Code lists them. */
+function listConnections(): Promise<string> {
+  if (isE2E) return fromTestFile('test-connections.txt', '')()
+  return new Promise((resolve) => {
+    execFile(
+      posixShell(process.env.SHELL),
+      ['-l', '-c', 'claude mcp list'],
+      { timeout: 60_000, env: buildSessionEnv(process.env, app.getVersion()), cwd: companionDir },
+      (_error, stdout) => resolve(stdout ?? '')
+    )
+  })
+}
 
 let readingDays: ReturnType<TokenLedger['read']> | null = null
 
@@ -206,7 +302,9 @@ function registerIpc(
   installed: Promise<string[]>,
   catalogue: ModelCatalogue
 ): void {
-  handle(IPC.loadState, () => store.get())
+  // The companion comes first, and is Telegraph's: it is not in the state file.
+  const projectsOf = () => [companionProject(companionDir), ...store.get().projects]
+  handle(IPC.loadState, () => ({ ...store.get(), projects: projectsOf() }))
 
   handle(IPC.installedLaunchers, () => installed)
 
@@ -218,14 +316,26 @@ function registerIpc(
 
   handle(IPC.listChats, (projectId: unknown, launcherId: unknown) => {
     // Found by what Telegraph knows of them: the window does not get to name a folder to read.
-    const { projects, launchers } = store.get()
-    const project = projects.find((candidate) => candidate.id === projectId)
-    const launcher = launchers.find((candidate) => candidate.id === launcherId)
+    const project = projectsOf().find((candidate) => candidate.id === projectId)
+    const launcher = store.get().launchers.find((candidate) => candidate.id === launcherId)
     if (!project || launcher?.chats?.kind !== 'claude') return []
     return listChats({ configDir: claudeConfigDir, projectPath: project.path })
   })
 
   listen(IPC.notify, (notice: unknown) => notifier.notify(notice))
+
+  handle(IPC.readAgenda, () => agenda.state())
+
+  listen(IPC.refreshAgenda, () => void agenda.refresh().then(() => agenda.check()))
+
+  listen(IPC.sendSnapshot, (value: unknown) => {
+    const checked = checkSnapshot(value)
+    if (!checked) return
+    snapshot = checked
+    updateContext()
+  })
+
+  handle(IPC.listConnections, async () => parseConnections(await listConnections()))
 
   listen(IPC.withdrawNotice, (sessionId: unknown) => notifier.withdraw(sessionId))
 
@@ -442,12 +552,15 @@ function createWindow(): void {
   created.webContents.on('did-start-navigation', (details) => {
     if (!details.isMainFrame || details.isSameDocument) return
     sessions.killAll()
+    pageLoaded = false
     notifier.clear()
     pageReports = false
   })
 
   // The page that is going can still tell of its sessions ending, after it was cleared up behind.
   created.webContents.on('did-finish-load', () => {
+    pageLoaded = true
+    for (const prompt of heldAsks.splice(0)) send(IPC.askCompanion, prompt)
     notifier.clear()
     // A theme chosen while the page was loading was told of before it could hear it.
     send(IPC.themeChanged, theme)
@@ -511,6 +624,13 @@ if (!app.requestSingleInstanceLock()) {
       fetch: isE2E ? null : (url, options) => net.fetch(url, options)
     })
     registerIpc(store, installed, catalogue)
+
+    writeBriefing(companionDir)
+    agenda.load()
+    const readAgenda = (): void => void agenda.refresh().then(() => agenda.check())
+    readAgenda()
+    setInterval(readAgenda, HOUR_MS)
+    setInterval(() => agenda.check(), MINUTE_MS)
 
     const setMenu = (offered: typeof launchers): void =>
       Menu.setApplicationMenu(

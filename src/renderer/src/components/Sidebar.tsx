@@ -1,15 +1,17 @@
 import { STATUS_LABELS } from '@shared/status'
 import type { GitStatus, Launcher, Project } from '@shared/types'
 import { THEMES, type ThemeName } from '@shared/themes'
+import type { AgendaState } from '@shared/types'
 import {
   activateSession,
   addProject,
   chooseTheme,
+  openConnections,
   endSession,
   selectProject,
   startRenaming
 } from '../controller'
-import { describeGit } from '../format'
+import { describeGit, describeMeetingTime } from '../format'
 import { modelOf, sessionLabel, type AppState, type SessionView } from '../store'
 import { NameField } from './NameField'
 import { ProjectMenu } from './ProjectMenu'
@@ -32,6 +34,7 @@ export function Sidebar({ state }: { state: AppState }) {
             renamingSessionId={state.renaming?.place === 'sidebar' ? state.renaming.sessionId : null}
             activeSessionId={state.activeSessionId}
             selected={state.selectedProjectId === project.id}
+            agenda={project.companion ? state.agenda : null}
           />
         ))}
       </div>
@@ -52,6 +55,32 @@ export function Sidebar({ state }: { state: AppState }) {
   )
 }
 
+/** What the companion knows of the day, under its name. Pressed, it shows what it is connected to. */
+function NextMeeting({ agenda }: { agenda: AgendaState | null }) {
+  const now = Date.now()
+  const next = agenda?.meetings.find((meeting) => !meeting.allDay && Date.parse(meeting.end) > now)
+  const needsSignIn = agenda?.status === 'unavailable' && !next
+  const text = next
+    ? `Next: ${next.title} ${describeMeetingTime(next.start)}`
+    : needsSignIn
+      ? 'Calendar needs signing in'
+      : agenda?.status === 'reading' || agenda === null
+        ? 'Reading the calendar…'
+        : agenda.status === 'failed'
+          ? 'Calendar could not be read'
+          : 'No more meetings today'
+  return (
+    <button
+      type="button"
+      className={needsSignIn ? 'companion-next needs-attention' : 'companion-next'}
+      title="Connections"
+      onClick={openConnections}
+    >
+      {text}
+    </button>
+  )
+}
+
 interface ProjectGroupProps {
   project: Project
   launchers: Launcher[]
@@ -61,13 +90,15 @@ interface ProjectGroupProps {
   selected: boolean
   modelOf(session: SessionView): string | null
   renamingSessionId: string | null
+  /** For the companion: the meetings, of which the next is shown under its name. */
+  agenda: AgendaState | null
 }
 
 function ProjectGroup(props: ProjectGroupProps) {
-  const { project, launchers, git, sessions, activeSessionId, selected, modelOf: model, renamingSessionId } = props
+  const { project, launchers, git, sessions, activeSessionId, selected, modelOf: model, renamingSessionId, agenda } = props
   const unread = sessions.filter((session) => session.unread).length
   return (
-    <section className={selected ? 'project is-selected' : 'project'}>
+    <section className={['project', selected && 'is-selected', project.companion && 'is-companion'].filter(Boolean).join(' ')}>
       <div className="project-head">
         <button
           type="button"
@@ -87,6 +118,7 @@ function ProjectGroup(props: ProjectGroupProps) {
         </button>
         <ProjectMenu project={project} launchers={launchers} hasSessions={sessions.length > 0} />
       </div>
+      {project.companion && <NextMeeting agenda={agenda} />}
       {sessions.length > 0 && (
         <ul className="wire">
           {sessions.map((session) => (

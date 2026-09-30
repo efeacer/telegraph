@@ -32,6 +32,13 @@ describe('parseAgenda', () => {
     })
   })
 
+  it('gives the reason without what comes before it', () => {
+    expect(parseAgenda('EVENTS: UNAVAILABLE - Google Calendar requires authentication')).toEqual({
+      status: 'unavailable',
+      reason: 'Google Calendar requires authentication'
+    })
+  })
+
   it('says so when the answer is not an agenda', () => {
     expect(parseAgenda('I would rather not.')).toEqual({ status: 'unreadable' })
     expect(parseAgenda('EVENTS: [not json')).toEqual({ status: 'unreadable' })

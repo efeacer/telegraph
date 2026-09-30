@@ -26,6 +26,8 @@ export interface NotifierTools {
  */
 export class Notifier {
   private readonly shown = new Map<string, Banner>()
+  /** Offers of the app's own, which the window neither asked for nor takes back. */
+  private readonly offers = new Set<string>()
 
   constructor(
     private readonly tools: NotifierTools,
@@ -36,13 +38,23 @@ export class Notifier {
   notify(value: unknown): void {
     const notice = checkNotice(value)
     if (notice === null) return
+    this.show(notice.sessionId, { title: notice.title, body: notice.body }, () => this.onOpen(notice.sessionId))
+  }
+
+  /** Shows a notice of the app's own, and does what it offers when it is pressed. */
+  offer(key: string, options: { title: string; body: string }, onPress: () => void): void {
+    this.offers.add(key)
+    this.show(key, options, onPress)
+  }
+
+  private show(key: string, options: { title: string; body: string }, onPress: () => void): void {
     try {
       if (!this.tools.supported()) return
-      this.withdraw(notice.sessionId)
-      const banner = this.tools.create({ title: notice.title, body: notice.body })
-      banner.onClick(() => this.onOpen(notice.sessionId))
+      this.withdraw(key)
+      const banner = this.tools.create(options)
+      banner.onClick(onPress)
       banner.show()
-      this.shown.set(notice.sessionId, banner)
+      this.shown.set(key, banner)
     } catch {
       // Not shown.
     }
@@ -63,7 +75,7 @@ export class Notifier {
 
   /** Takes back everything: the window has started over, and the sessions it told of are no more. */
   clear(): void {
-    for (const sessionId of [...this.shown.keys()]) this.withdraw(sessionId)
+    for (const key of [...this.shown.keys()]) if (!this.offers.has(key)) this.withdraw(key)
     this.badge(0)
   }
 

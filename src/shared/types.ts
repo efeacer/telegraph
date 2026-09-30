@@ -220,6 +220,14 @@ export interface TelegraphApi {
   /** The chats a launcher has had in a project, the latest first. None if it keeps none. */
   listChats(projectId: string, launcherId: string): Promise<Chat[]>
   readUsage(): Promise<Usage>
+  readAgenda(): Promise<AgendaState>
+  refreshAgenda(): void
+  onAgendaChanged(listener: (agenda: AgendaState) => void): () => void
+  /** Tells the companion what the sessions are doing. */
+  sendSnapshot(snapshot: SessionSnapshot): void
+  /** Called with what the companion is to be asked, when the user takes up an offer of help. */
+  onAskCompanion(listener: (prompt: string) => void): () => void
+  listConnections(): Promise<Connection[]>
   /** Tells the user, by a notice of the system, of a session they are not looking at. */
   notify(notice: Notice): void
   /** Takes back the notice of a session the user has gone to. */

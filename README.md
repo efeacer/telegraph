@@ -43,6 +43,14 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## The companion
+
+At the top of the sidebar is a Claude chat that is always open. It knows your
+meetings, your mail and what your sessions are doing, through the connectors
+of your Claude account. Half an hour before a meeting Telegraph offers its
+help, and pressing the notice asks it to help you prepare. Connections… in
+its menu shows what it can reach, and where to add more.
+
 ## Renaming a chat
 
 Double-click the name of a session, or press ⇧⌘R, to rename it. Claude is

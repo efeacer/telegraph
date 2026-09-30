@@ -77,6 +77,23 @@ describe('Notifier', () => {
     expect(() => notifier.clear()).not.toThrow()
   })
 
+  it('shows an offer of its own, and does what it offers when pressed', () => {
+    const { notifier, banners } = setup()
+    const taken = vi.fn()
+    notifier.offer('meeting', { title: '“Design review” in 30 minutes', body: 'Want help?' }, taken)
+    expect(banners[0]).toMatchObject({ shown: true, options: { title: '“Design review” in 30 minutes' } })
+    banners[0]!.click()
+    expect(taken).toHaveBeenCalledOnce()
+  })
+
+  it('keeps its own offers when the window starts over, which knows nothing of them', () => {
+    const { notifier, banners } = setup()
+    notifier.offer('meeting a', { title: 'Soon', body: 'Help?' }, () => {})
+    notifier.notify(notice(FIRST))
+    notifier.clear()
+    expect(banners.map((banner) => banner.closed)).toEqual([false, true])
+  })
+
   it('shows nothing of what is not a notice', () => {
     const { notifier, banners } = setup()
     notifier.notify({ sessionId: FIRST })

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Launcher, Project } from '@shared/types'
-import { removeProject, showPicker, startSession } from '../controller'
+import { openConnections, removeProject, showPicker, startSession } from '../controller'
 
 interface ProjectMenuProps {
   project: Project
@@ -85,16 +85,22 @@ export function ProjectMenu({ project, launchers, hasSessions }: ProjectMenuProp
             Choose a model or a chat…
           </button>
           <div className="menu-divider" role="separator" />
-          <button
-            type="button"
-            role="menuitem"
-            className="menu-item"
-            disabled={hasSessions}
-            title={hasSessions ? 'End the sessions in this project first' : undefined}
-            onClick={() => choose(() => void removeProject(project.id))}
-          >
-            Remove project
-          </button>
+          {project.companion ? (
+            <button type="button" role="menuitem" className="menu-item" onClick={() => choose(openConnections)}>
+              Connections…
+            </button>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-item"
+              disabled={hasSessions}
+              title={hasSessions ? 'End the sessions in this project first' : undefined}
+              onClick={() => choose(() => void removeProject(project.id))}
+            >
+              Remove project
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -97,3 +97,12 @@ export function newTokens(tokens: Tokens): number {
 export function wholePercent(percent: number): number {
   return percent >= 100 ? 100 : Math.min(99, Math.round(percent))
 }
+
+/** When a meeting is: its hour today, or the day and the hour if it is not today. */
+export function describeMeetingTime(time: string, now = new Date()): string {
+  const then = new Date(time)
+  if (Number.isNaN(then.getTime())) return ''
+  const clock = `${String(then.getHours()).padStart(2, '0')}:${String(then.getMinutes()).padStart(2, '0')}`
+  const sameDay = then.toDateString() === now.toDateString()
+  return sameDay ? `at ${clock}` : `${WEEKDAYS[then.getDay()]} at ${clock}`
+}
