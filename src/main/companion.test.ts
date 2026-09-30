@@ -15,9 +15,16 @@ afterEach(() => {
 })
 
 describe('the briefing of the companion', () => {
-  it('is written where the companion starts, for Claude to read', () => {
+  it('is written where the companion starts, for whichever agent it is to read', () => {
     writeBriefing(join(directory, 'companion'))
-    expect(readFileSync(join(directory, 'companion', 'CLAUDE.md'), 'utf8')).toBe(BRIEFING)
+    for (const name of ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']) {
+      expect(readFileSync(join(directory, 'companion', name), 'utf8'), name).toBe(BRIEFING)
+    }
+  })
+
+  it('tells it how to read the calendars and the mail, whatever agent it is', () => {
+    expect(BRIEFING).toContain('telegraph meetings')
+    expect(BRIEFING).toContain('telegraph mail search')
   })
 
   it('points it to what Telegraph knows, and keeps it from acting unasked', () => {

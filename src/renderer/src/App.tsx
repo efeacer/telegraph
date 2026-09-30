@@ -11,7 +11,7 @@ export function App() {
       <Sidebar state={state} />
       <Stage state={state} />
       {state.reportingBug && <BugReport />}
-      {state.connectionsOpen && <Connections agenda={state.agenda} />}
+      {state.connectionsOpen && <Connections agenda={state.agenda} google={state.google} />}
     </div>
   )
 }

@@ -95,12 +95,14 @@ export async function start(page: Page, launcher: string): Promise<void> {
 }
 
 export async function launch(
-  workspace: Workspace
+  workspace: Workspace,
+  extraEnv: Record<string, string> = {}
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     args: [join(__dirname, '..')],
     env: {
       ...process.env,
+      ...extraEnv,
       TELEGRAPH_E2E: '1',
       TELEGRAPH_USER_DATA: workspace.userData,
       CLAUDE_CONFIG_DIR: configDirOf(workspace),

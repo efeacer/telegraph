@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Meeting } from '@shared/agenda'
+import type { GoogleStatus } from '@shared/types'
 import { readCalendars, readEvents, readMessage, readMessageList, type MailMessage } from './api'
 import {
   authUrl,
@@ -45,12 +46,7 @@ export const GOOGLE_ENDPOINTS: GoogleEndpoints = {
   gmail: 'https://gmail.googleapis.com/gmail/v1'
 }
 
-export type GoogleStatus =
-  /** Telegraph is not registered with Google, so there is nothing to sign in to. */
-  | { state: 'unconfigured' }
-  | { state: 'disconnected'; reason?: string }
-  | { state: 'connecting' }
-  | { state: 'connected'; email: string }
+export type { GoogleStatus } from '@shared/types'
 
 export interface AccountOptions {
   filePath: string

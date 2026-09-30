@@ -5,6 +5,9 @@ import { isDeepStrictEqual } from 'node:util'
 import { DEFAULT_LAUNCHERS } from '@shared/launchers'
 import { isModelId, readModels } from '@shared/models'
 import { DEFAULT_THEME, isThemeName } from '@shared/themes'
+
+// The companion is Telegraph's own place, not in the file, but what was chosen for it is.
+const COMPANION_ID = 'companion'
 import type { Choice, Launcher, Mode, PersistedState, Project } from '@shared/types'
 
 // The first version wrote its launchers to the file in full. Left as they
@@ -85,7 +88,8 @@ export function parseState(json: string): PersistedState {
   const choices: Record<string, Choice> = {}
   for (const [projectId, value] of Object.entries(isRecord(raw.choices) ? raw.choices : {})) {
     const choice = readChoice(value)
-    if (choice && projects.some((project) => project.id === projectId)) choices[projectId] = choice
+    const known = projectId === COMPANION_ID || projects.some((project) => project.id === projectId)
+    if (choice && known) choices[projectId] = choice
   }
   return {
     projects,
@@ -134,7 +138,8 @@ export class StateStore {
   /** Takes what the window says was chosen, which is checked like anything read from the file. */
   saveChoice(projectId: string, value: unknown): void {
     const choice = readChoice(value)
-    if (!choice || !this.state.projects.some((project) => project.id === projectId)) return
+    const known = projectId === COMPANION_ID || this.state.projects.some((project) => project.id === projectId)
+    if (!choice || !known) return
     this.update({ ...this.state, choices: { ...this.state.choices, [projectId]: choice } })
   }
 

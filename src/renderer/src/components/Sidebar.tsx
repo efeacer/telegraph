@@ -13,6 +13,7 @@ import {
 } from '../controller'
 import { describeGit, describeMeetingTime } from '../format'
 import { modelOf, sessionLabel, type AppState, type SessionView } from '../store'
+import { Icon } from './Icon'
 import { NameField } from './NameField'
 import { ProjectMenu } from './ProjectMenu'
 import { Select } from './Select'
@@ -39,8 +40,11 @@ export function Sidebar({ state }: { state: AppState }) {
         ))}
       </div>
       <div className="sidebar-foot">
-        <button type="button" className="quiet-button" onClick={() => void addProject()}>
-          Add project
+        <button type="button" className="foot-button" onClick={() => void addProject()} title="Add a folder to work in">
+          <Icon name="plus" /> Add project
+        </button>
+        <button type="button" className="foot-button" onClick={openConnections} title="Connect your calendar and mail">
+          <Icon name="plug" /> Connections
         </button>
         <span className="theme-choice">
           <Select

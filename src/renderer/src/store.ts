@@ -6,6 +6,7 @@ import type {
   Catalogue,
   Choice,
   GitStatus,
+  GoogleStatus,
   Launcher,
   Model,
   Project,
@@ -62,6 +63,7 @@ export interface AppState {
   usage: Usage | null
   /** The meetings of the user, as far as Telegraph knows them. Null until it was read. */
   agenda: AgendaState | null
+  google: GoogleStatus
   connectionsOpen: boolean
   sessions: SessionView[]
   activeSessionId: string | null
@@ -84,6 +86,7 @@ let state: AppState = {
   git: {},
   usage: null,
   agenda: null,
+  google: { state: 'unconfigured' },
   connectionsOpen: false,
   sessions: [],
   activeSessionId: null,

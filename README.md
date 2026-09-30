@@ -43,6 +43,46 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Connecting Google
+
+Press **Connections** at the foot of the sidebar, then **Connect Google**, and
+sign in in the browser. From then on your agents can read your calendars and
+Gmail, whatever agent they are, with the `telegraph` command:
+
+```sh
+telegraph meetings
+telegraph mail search from:ada newer_than:7d
+telegraph mail read <id>
+```
+
+Telegraph only reads: it sends, changes and deletes nothing. The key to your
+account is kept in the macOS keychain, and never given to an agent.
+
+### Registering Telegraph with Google, once
+
+Google lets an app ask for sign-ins only once it is registered. Whoever builds
+this copy of Telegraph does this once; everyone who uses it then just presses
+Connect Google.
+
+1. Open [console.cloud.google.com](https://console.cloud.google.com) and create a
+   project named Telegraph.
+2. In **APIs & Services → Library**, enable the **Google Calendar API** and the
+   **Gmail API**.
+3. In **Google Auth Platform**, set up the app: name Telegraph, audience
+   **External**, and your own email as contact. Under **Audience**, add
+   yourself as a test user.
+4. Under **Clients**, create a client of type **Desktop app**, and download its
+   JSON file.
+5. Save the file as `resources/google-oauth.json` in this repository, then run
+   `npm run package` (or save it as `google-oauth.json` in Telegraph's data
+   folder, `~/Library/Application Support/Telegraph`, and restart Telegraph).
+
+While the app is in testing, Google asks for the sign-in again every seven
+days. Setting it to **In production** under **Audience** ends that; Google then
+shows a warning that the app is not verified, which is fine for your own use.
+Giving Telegraph to many people needs Google's verification, since Gmail is a
+restricted scope.
+
 ## The companion
 
 At the top of the sidebar is a Claude chat that is always open. It knows your

@@ -13,6 +13,7 @@ import {
   ipcMain,
   nativeImage,
   net,
+  safeStorage,
   shell,
   type IpcMainEvent,
   type IpcMainInvokeEvent
@@ -27,6 +28,9 @@ import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@sh
 import { Attachments } from './attachments'
 import { BugLog } from './buglog'
 import { AgendaWatcher, askClaudeForAgenda } from './agenda'
+import { Bridge, socketPathFor } from './bridge'
+import { GoogleAccount, type GoogleStatus } from './google/account'
+import { loadGoogleClient } from './google/client'
 import { ModelCatalogue } from './catalogue'
 import {
   checkSnapshot,
@@ -166,6 +170,104 @@ const HOUR_MS = 60 * 60_000
 const MINUTE_MS = 60_000
 let snapshot: SessionSnapshot = { sessions: [] }
 
+const askClaude = isE2E
+  ? () => fromTestFile('test-agenda.txt', 'EVENTS: []')()
+  : askClaudeForAgenda({
+      shell: posixShell(process.env.SHELL),
+      cwd: companionDir,
+      env: buildSessionEnv(process.env, app.getVersion())
+    })
+
+function endOfTomorrow(now: number): number {
+  const at = new Date(now)
+  return new Date(at.getFullYear(), at.getMonth(), at.getDate() + 2).getTime()
+}
+
+// The user's Google account, which Telegraph signs in to itself and reads for every agent.
+// Made once the app is ready: its key is sealed by the keychain, which is not there before.
+const resourcesDir = app.isPackaged ? process.resourcesPath : join(__dirname, '../../resources')
+const testGoogle = isE2E ? process.env.TELEGRAPH_TEST_GOOGLE : undefined
+let google: GoogleAccount | null = null
+let bridge: Bridge | null = null
+
+function makeGoogle(): GoogleAccount {
+  // Under test the key is sealed by a stand-in, which asks no keychain on the user's desktop.
+  const sealTest = (text: string): Buffer => Buffer.from([...text].reverse().join(''))
+  return new GoogleAccount({
+    filePath: join(app.getPath('userData'), 'google.json'),
+    client: () =>
+      testGoogle
+        ? { clientId: 'test' }
+        : isE2E
+          ? null
+          : loadGoogleClient([join(app.getPath('userData'), 'google-oauth.json'), join(resourcesDir, 'google-oauth.json')]),
+    encrypt: isE2E ? sealTest : (plain) => safeStorage.encryptString(plain),
+    decrypt: isE2E ? (sealed) => [...sealed.toString()].reverse().join('') : (sealed) => safeStorage.decryptString(sealed),
+    // Under test, the stand-in Google signs in whoever asks, and no browser is opened.
+    openBrowser: testGoogle ? async (url) => void (await fetch(url)) : (url) => shell.openExternal(url),
+    ...(testGoogle
+      ? {
+          endpoints: {
+            auth: `${testGoogle}/auth`,
+            token: `${testGoogle}/token`,
+            revoke: `${testGoogle}/revoke`,
+            userinfo: `${testGoogle}/userinfo`,
+            calendar: `${testGoogle}/calendar/v3`,
+            gmail: `${testGoogle}/gmail/v1`
+          }
+        }
+      : {})
+  })
+}
+
+const NOT_CONNECTED = 'Google is not connected. Press Connections in the sidebar of Telegraph to connect it.'
+
+function connectedGoogle(): GoogleAccount {
+  if (google?.status().state !== 'connected') throw new Error(NOT_CONNECTED)
+  return google
+}
+
+async function openBridge(): Promise<void> {
+  bridge = new Bridge({
+    socketPath: socketPathFor(app.getPath('userData')),
+    handlers: {
+      status: async () => {
+        const status = google?.status() ?? { state: 'unconfigured' }
+        return { google: status.state, ...(status.state === 'connected' ? { account: status.email } : {}) }
+      },
+      meetings: async (days) => {
+        const now = Date.now()
+        if (google?.status().state === 'connected') return google.meetings(now, now + days * 24 * 60 * 60_000)
+        return agenda.state().meetings
+      },
+      searchMail: (query, most) => connectedGoogle().searchMail(query, most),
+      readMail: (id) => connectedGoogle().readMail(id)
+    }
+  })
+  try {
+    await bridge.listen()
+  } catch {
+    // Without it the telegraph command says that Telegraph cannot be reached.
+    bridge = null
+  }
+}
+
+/** What every session is given: the telegraph command, and how it reaches Telegraph. */
+function sessionExtras(): Record<string, string> {
+  if (!bridge) return {}
+  return {
+    TELEGRAPH_BRIDGE: bridge.socketPath,
+    TELEGRAPH_BRIDGE_TOKEN: bridge.token,
+    TELEGRAPH_NODE: process.execPath,
+    TELEGRAPH_CLI: join(resourcesDir, 'cli', 'telegraph.cjs'),
+    TELEGRAPH_BIN: join(resourcesDir, 'bin')
+  }
+}
+
+function sendGoogleStatus(): void {
+  send(IPC.googleChanged, google?.status() ?? { state: 'unconfigured' })
+}
+
 /** Under test, what Claude would answer is in a file of the test, and Claude is never asked. */
 function fromTestFile(name: string, otherwise: string): () => Promise<string> {
   return async () => {
@@ -179,13 +281,14 @@ function fromTestFile(name: string, otherwise: string): () => Promise<string> {
 
 const agenda = new AgendaWatcher({
   filePath: join(app.getPath('userData'), 'agenda.json'),
-  fetch: isE2E
-    ? fromTestFile('test-agenda.txt', 'EVENTS: []')
-    : askClaudeForAgenda({
-        shell: posixShell(process.env.SHELL),
-        cwd: companionDir,
-        env: buildSessionEnv(process.env, app.getVersion())
-      }),
+  fetch: async () => {
+    // From Google, where it is connected: free, and quick.
+    if (google?.status().state === 'connected') {
+      const now = Date.now()
+      return `EVENTS: ${JSON.stringify(await google.meetings(now, endOfTomorrow(now)))}`
+    }
+    return askClaude()
+  },
   onChange: (state) => {
     send(IPC.agendaChanged, state)
     updateContext()
@@ -257,7 +360,8 @@ const sessions = new PtyManager(app.getVersion(), {
     meters.retire(sessionId)
     send(IPC.sessionExit, sessionId, exitCode)
   },
-  usageFileFor: (sessionId) => meters.fileFor(sessionId)
+  usageFileFor: (sessionId) => meters.fileFor(sessionId),
+  extraEnv: () => sessionExtras()
 })
 
 function send(channel: string, ...args: unknown[]): void {
@@ -336,6 +440,25 @@ function registerIpc(
   })
 
   handle(IPC.listConnections, async () => parseConnections(await listConnections()))
+
+  handle(IPC.googleStatus, (): GoogleStatus => google?.status() ?? { state: 'unconfigured' })
+
+  handle(IPC.connectGoogle, async (): Promise<GoogleStatus> => {
+    if (!google) return { state: 'unconfigured' }
+    const connecting = google.connect()
+    sendGoogleStatus()
+    await connecting
+    sendGoogleStatus()
+    if (google.status().state === 'connected') void agenda.refresh().then(() => agenda.check())
+    return google.status()
+  })
+
+  handle(IPC.disconnectGoogle, async (): Promise<GoogleStatus> => {
+    await google?.disconnect()
+    sendGoogleStatus()
+    void agenda.refresh()
+    return google?.status() ?? { state: 'unconfigured' }
+  })
 
   listen(IPC.withdrawNotice, (sessionId: unknown) => notifier.withdraw(sessionId))
 
@@ -595,6 +718,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('window-all-closed', () => app.quit())
   app.on('will-quit', () => {
+    void bridge?.close()
     sessions.killAll()
     bugLog.stop()
   })
@@ -627,9 +751,19 @@ if (!app.requestSingleInstanceLock()) {
 
     writeBriefing(companionDir)
     agenda.load()
-    const readAgenda = (): void => void agenda.refresh().then(() => agenda.check())
+    google = makeGoogle()
+    void openBridge()
+    // Every ten minutes from Google, which costs nothing. Every hour from Claude, which costs a little.
+    let askedClaudeAt = 0
+    const readAgenda = (): void => {
+      if (google?.status().state !== 'connected') {
+        if (Date.now() - askedClaudeAt < HOUR_MS) return
+        askedClaudeAt = Date.now()
+      }
+      void agenda.refresh().then(() => agenda.check())
+    }
     readAgenda()
-    setInterval(readAgenda, HOUR_MS)
+    setInterval(readAgenda, 10 * MINUTE_MS)
     setInterval(() => agenda.check(), MINUTE_MS)
 
     const setMenu = (offered: typeof launchers): void =>

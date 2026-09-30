@@ -51,6 +51,12 @@ describe('StateStore', () => {
     })
   })
 
+  it('remembers which agent the companion is', () => {
+    const store = new StateStore(filePath)
+    store.saveChoice('companion', { launcherId: 'codex', models: {} })
+    expect(new StateStore(filePath).get().choices).toEqual({ companion: { launcherId: 'codex', models: {} } })
+  })
+
   it('remembers nothing for a project it does not have', () => {
     const store = new StateStore(filePath)
     store.saveChoice('gone', { launcherId: 'claude', models: {} })

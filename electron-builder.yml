@@ -11,6 +11,12 @@ files:
 asarUnpack:
   - node_modules/node-pty/**
 npmRebuild: false
+# The telegraph command, and Telegraph's registration with Google if there is one.
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - "**/*"
 mac:
   category: public.app-category.developer-tools
   target: dir

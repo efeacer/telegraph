@@ -21,8 +21,13 @@ how the work in their sessions fits around them.
 - \`context.md\` in this folder is kept up to date by Telegraph: the time,
   the meetings it knows of, and what each of the user's sessions is doing.
   Read it at the start of every answer that is about the day.
-- Your tools reach the connectors of the user's Claude account, such as
-  their calendar and their mail. Use them to look things up.
+- The \`telegraph\` command reads the user's calendars and mail, whatever
+  agent you are. Run \`telegraph help\` to see how. For example:
+  \`telegraph meetings\`, \`telegraph mail search from:ada newer_than:7d\`,
+  \`telegraph mail read <id>\`. If it says Google is not connected, tell the
+  user to press Connections in Telegraph's sidebar.
+- If you are Claude, the connectors of the user's Claude account may reach
+  more, such as their drive.
 
 ## How you work
 
@@ -37,9 +42,12 @@ how the work in their sessions fits around them.
   the project.
 `
 
+/** Where each agent looks for its instructions: Claude, Codex and others, and Gemini. */
+export const BRIEFING_FILES = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']
+
 export function writeBriefing(directory: string): void {
   mkdirSync(directory, { recursive: true, mode: 0o700 })
-  writeFileSync(join(directory, 'CLAUDE.md'), BRIEFING)
+  for (const name of BRIEFING_FILES) writeFileSync(join(directory, name), BRIEFING)
 }
 
 export function companionProject(directory: string): Project {

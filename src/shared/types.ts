@@ -15,6 +15,14 @@ export interface SessionSnapshot {
   sessions: { label: string; project: string; status: string; model: string | null }[]
 }
 
+/** The user's Google account, as Telegraph is connected to it. */
+export type GoogleStatus =
+  /** Telegraph is not registered with Google, so there is nothing to sign in to. */
+  | { state: 'unconfigured' }
+  | { state: 'disconnected'; reason?: string }
+  | { state: 'connecting' }
+  | { state: 'connected'; email: string }
+
 /** A connector the agents can reach: of the user's Claude account, or set up in Claude Code. */
 export interface Connection {
   name: string
@@ -228,6 +236,11 @@ export interface TelegraphApi {
   /** Called with what the companion is to be asked, when the user takes up an offer of help. */
   onAskCompanion(listener: (prompt: string) => void): () => void
   listConnections(): Promise<Connection[]>
+  googleStatus(): Promise<GoogleStatus>
+  /** Signs in to Google in the browser. Resolves once that is done, or has failed. */
+  connectGoogle(): Promise<GoogleStatus>
+  disconnectGoogle(): Promise<GoogleStatus>
+  onGoogleChanged(listener: (status: GoogleStatus) => void): () => void
   /** Tells the user, by a notice of the system, of a session they are not looking at. */
   notify(notice: Notice): void
   /** Takes back the notice of a session the user has gone to. */

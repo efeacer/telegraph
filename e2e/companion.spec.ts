@@ -131,10 +131,33 @@ test('lists the connections, and where to add more', async () => {
   await page.getByRole('menuitem', { name: 'Connections…' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Connections' })
+  // Kept out of the way, for those who use Claude's own connectors.
+  await dialog.getByText('More for Claude').click()
   await expect(dialog.getByRole('listitem')).toHaveText([/Gmail\s*Connected/, /Google Calendar\s*Connected/, /my-notes\s*Not reachable/])
   await expect(dialog).toContainText(/Read 1 meeting at \d\d:\d\d/)
   await expect(dialog.getByRole('button', { name: 'Add Outlook, iCloud and others' })).toBeVisible()
   await expect(companion().getByRole('button', { name: 'Start a session in Companion' })).toBeVisible()
+})
+
+test('can be another agent than Claude, and stays the one chosen', async () => {
+  prepare()
+  const path = join(workspace.userData, 'state.json')
+  const state = JSON.parse(readFileSync(path, 'utf8'))
+  state.launchers.push({ id: 'codex', name: 'Codex', command: 'echo codex companion' })
+  writeFileSync(path, JSON.stringify(state))
+  ;({ app, page } = await launch(workspace))
+  await expect(companion().locator('.session')).toHaveCount(1)
+
+  // Chosen by starting it in the companion's place.
+  await companion().getByRole('button', { name: 'Start a session in Companion' }).click()
+  await page.getByRole('menuitem', { name: 'Start Codex' }).click()
+  await expect(page.locator('.terminal-view.is-active .xterm-rows')).toContainText('codex companion')
+  await app.close()
+
+  ;({ app, page } = await launch(workspace))
+  await companion().locator('.session-main').click()
+  await expect(page.locator('.terminal-view.is-active .xterm-rows')).toContainText('codex companion')
+  expect(readFileSync(join(companionDir(), 'AGENTS.md'), 'utf8')).toContain('telegraph meetings')
 })
 
 test('cannot be removed', async () => {

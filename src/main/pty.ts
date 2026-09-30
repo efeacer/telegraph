@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs'
+import { delimiter } from 'node:path'
 import * as pty from 'node-pty'
 import type { CreateSessionRequest } from '@shared/types'
 import { USAGE_FILE_VARIABLE } from '@shared/usage'
@@ -20,6 +21,8 @@ export interface SessionEvents {
   onExit(sessionId: string, exitCode: number): void
   /** The file the session is to report what it uses to, if there is one. */
   usageFileFor?(sessionId: string): string | null
+  /** More for the environment of every session. A TELEGRAPH_BIN in it is put first on the PATH. */
+  extraEnv?(): Record<string, string>
 }
 
 export class PtyManager {
@@ -49,7 +52,7 @@ export class PtyManager {
       cols: request.cols,
       rows: request.rows,
       cwd: request.cwd,
-      env: usageFile ? { ...invocation.env, [USAGE_FILE_VARIABLE]: usageFile } : invocation.env
+      env: withExtras(invocation.env, usageFile, this.events.extraEnv?.() ?? {})
     })
 
     const session: Session = {
@@ -114,6 +117,18 @@ export class PtyManager {
     session.pending = ''
     this.events.onData(sessionId, data)
   }
+}
+
+function withExtras(
+  env: Record<string, string>,
+  usageFile: string | null | undefined,
+  extras: Record<string, string>
+): Record<string, string> {
+  const joined: Record<string, string> = { ...env, ...extras }
+  if (usageFile) joined[USAGE_FILE_VARIABLE] = usageFile
+  // The telegraph command is found before any other of the name.
+  if (extras.TELEGRAPH_BIN) joined.PATH = [extras.TELEGRAPH_BIN, env.PATH].filter(Boolean).join(delimiter)
+  return joined
 }
 
 function isDirectory(path: string): boolean {

@@ -1621,3 +1621,201 @@ button:focus-visible {
   text-underline-offset: 2px;
   cursor: pointer;
 }
+
+/* Icons sit on the line of the text beside them. */
+.icon {
+  flex: none;
+  vertical-align: -3px;
+}
+
+.foot-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+.foot-button:hover {
+  color: var(--paper);
+  background: var(--night-raised);
+}
+
+.sidebar-foot .theme-choice {
+  margin-left: auto;
+}
+
+.primary-button {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  color: var(--well);
+  background: var(--glass);
+}
+
+.primary-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.primary-button:disabled {
+  opacity: 0.55;
+}
+
+/*
+ * A pane at the side
+ *
+ * Opens from the right over the stage, and leaves the sidebar in view.
+ */
+.pane {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(420px, 100vw);
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0;
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  border: 0;
+  border-left: 1px solid var(--wire);
+  color: var(--paper);
+  background: var(--night);
+  box-shadow: -18px 0 40px var(--shadow);
+}
+
+.pane:not([open]) {
+  display: none;
+}
+
+.pane::backdrop {
+  background: var(--scrim);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pane[open] {
+    animation: pane-in 180ms ease-out;
+  }
+
+  @keyframes pane-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+  }
+}
+
+.pane-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--titlebar-height);
+  margin: 0 -20px;
+  padding: 0 14px 0 20px;
+  border-bottom: 1px solid var(--wire-faint);
+  background: var(--night);
+}
+
+.pane-head h1 {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: 650;
+  font-stretch: 100%;
+}
+
+.pane-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.card {
+  padding: 14px;
+  border: 1px solid var(--wire-faint);
+  border-radius: 10px;
+  background: var(--night-raised);
+}
+
+.card h2 {
+  display: inline;
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 650;
+  font-stretch: 100%;
+}
+
+.card-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.card-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--glass);
+  background: var(--night-pressed);
+}
+
+.google-mark {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--paper);
+}
+
+.card-hint {
+  margin: 4px 0 0;
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--slate);
+}
+
+.card-hint .icon {
+  vertical-align: -2px;
+}
+
+.card-hint.is-problem {
+  color: var(--brass);
+}
+
+.card-state {
+  margin-top: 14px;
+}
+
+.card-state.is-connected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--glass);
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.card .connections-calendar {
+  margin: 12px 0 0;
+}
+
+.card.more summary {
+  cursor: default;
+  list-style-position: outside;
+}
+
+.card.more[open] summary {
+  margin-bottom: 6px;
+}

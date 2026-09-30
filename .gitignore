@@ -7,3 +7,7 @@ e2e/.results/
 .env
 .env.*
 *.log
+
+# How this copy of Telegraph is registered with Google. Not for the repository.
+resources/google-oauth.json
+google-oauth.json

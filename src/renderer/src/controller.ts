@@ -95,6 +95,8 @@ export async function initialize(): Promise<void> {
   api.onUsageChanged(() => void refreshUsage())
   api.onOpenSession(activateSession)
   api.onAgendaChanged((agenda) => setState((state) => ({ ...state, agenda })))
+  api.onGoogleChanged((google) => setState((state) => ({ ...state, google })))
+  void api.googleStatus().then((google) => setState((state) => ({ ...state, google })))
 
   const persisted = await api.loadState()
   // Null when it cannot be told, in which case every launcher is offered.
@@ -296,21 +298,31 @@ function startCompanion(): Promise<string | null> {
   return companionStarting
 }
 
+// The agents a companion can be, when none was chosen for it: the first of these that is installed.
+const COMPANION_AGENTS = ['claude', 'codex', 'gemini']
+
 async function launchCompanion(): Promise<string | null> {
   await ready
   const state = getState()
   const running = state.sessions.find((session) => session.projectId === COMPANION_ID && session.status !== 'exited')
   if (running) return running.id
-  if (!state.launchers.some((launcher) => launcher.id === 'claude')) return null
-  const chats = await listChats(COMPANION_ID, 'claude')
-  return startSession(COMPANION_ID, 'claude', { modeId: chats.length > 0 ? 'continue' : null }, true)
+  const agents = state.launchers.filter((launcher) => launcher.command !== null)
+  const chosen = state.choices[COMPANION_ID]?.launcherId
+  const launcher =
+    agents.find((candidate) => candidate.id === chosen) ??
+    COMPANION_AGENTS.map((id) => agents.find((candidate) => candidate.id === id)).find(Boolean)
+  if (!launcher) return null
+  // It goes on with the chat it had, where its agent keeps chats Telegraph can find.
+  const chats = launcher.chats ? await listChats(COMPANION_ID, launcher.id) : []
+  const continues = chats.length > 0 && launcher.modes?.some((mode) => mode.id === 'continue')
+  return startSession(COMPANION_ID, launcher.id, { modeId: continues ? 'continue' : null }, true)
 }
 
 /** Asks the companion something, bringing it to the front: the user asked for its help. */
 export async function askCompanion(line: string): Promise<void> {
   const sessionId = await startCompanion()
   if (!sessionId) {
-    setState((state) => ({ ...state, error: 'The companion needs Claude, which could not be found.' }))
+    setState((state) => ({ ...state, error: 'The companion needs an agent, such as Claude, Codex or Gemini, and none could be found.' }))
     return
   }
   activateSession(sessionId)
