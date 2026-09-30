@@ -1,7 +1,7 @@
 // Copies the packaged app into /Applications.
-import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { findRunning } from './lib/install.mjs'
 
 const APP_NAME = 'Telegraph.app'
 const destination = join('/Applications', APP_NAME)
@@ -31,11 +31,9 @@ console.log(`Installed ${destination}`)
 
 function isRunning() {
   try {
-    // With the processes this one descends from: started in a session of
-    // Telegraph, this script is one of them, and would not see it otherwise.
-    execFileSync('pgrep', ['-a', '-f', `${destination}/Contents/MacOS/`], { stdio: 'ignore' })
-    return true
+    return findRunning().includes(destination)
   } catch {
-    return false
+    // Better taken for running, and left alone, than replaced while it runs.
+    return true
   }
 }

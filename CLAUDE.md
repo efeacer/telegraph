@@ -44,8 +44,20 @@ user from there:
    chats with an agent are continued from the agent's own record of them:
    "continue the last chat" in the project.
 
-The app that was replaced is kept in `dist/previous`, and what happened is
-written to `dist/install-when-closed.log`.
+The app that was replaced is kept in `dist/previous.noindex`, and what
+happened is written to `dist/install-when-closed.log`.
+
+There must be one copy of Telegraph that can be started. macOS takes every
+`Telegraph.app` for the same app, and the one that comes up need not be the
+one in /Applications: on 2026-09-29 the copy in `dist` did, and packaging the
+next day wrote over its files while it ran. So:
+
+- `npm run package` refuses to run while Telegraph runs from `dist`.
+- The installer waits for Telegraph to close wherever it runs from, removes
+  the copy in `dist` once it is installed, starts the installed copy by its
+  path, and checks that it is the one that runs.
+- Before packaging, check where the running Telegraph runs from:
+  `node -e "import('./scripts/lib/install.mjs').then(m => console.log(m.findRunning()))"`.
 
 ## Improving Telegraph from its bug log
 

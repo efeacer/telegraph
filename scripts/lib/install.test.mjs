@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { replaceApp, waitUntilClosed } from './install.mjs'
+import { findRunning, launchExactly, replaceApp, waitUntilClosed } from './install.mjs'
 
 let root
 let source
@@ -13,7 +13,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'telegraph-install-'))
   source = join(root, 'dist', 'Telegraph.app')
   destination = join(root, 'Applications', 'Telegraph.app')
-  backup = join(root, 'dist', 'previous', 'Telegraph.app')
+  backup = join(root, 'dist', 'previous.noindex', 'Telegraph.app')
   mkdirSync(join(root, 'Applications'))
   app(source, 'new')
 })
@@ -140,5 +140,76 @@ describe('waitUntilClosed', () => {
     const closed = await waitUntilClosed({ isRunning: () => answers[checks++] ?? false, ...clock() })
     expect(closed).toBe(true)
     expect(checks).toBe(5)
+  })
+})
+
+describe('findRunning', () => {
+  // As ps lists them: the number of the process and the program it runs, without what it was started with.
+  const list = [
+    '  501 /Applications/Telegraph.app/Contents/MacOS/Telegraph',
+    '  502 /Applications/Telegraph.app/Contents/Frameworks/Telegraph Helper.app/Contents/MacOS/Telegraph Helper',
+    '  503 /Users/someone/My Projects/telegraph/dist/mac-arm64/Telegraph.app/Contents/MacOS/Telegraph',
+    '  504 /Users/someone/Projects/telegraph/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron',
+    '  505 /bin/zsh',
+    '  506 /Applications/Telegraph.app/Contents/MacOS/Telegraph   '
+  ].join('\n')
+
+  it('finds Telegraph wherever it runs from', () => {
+    expect(findRunning(list)).toEqual([
+      '/Applications/Telegraph.app',
+      '/Users/someone/My Projects/telegraph/dist/mac-arm64/Telegraph.app',
+      '/Applications/Telegraph.app'
+    ])
+  })
+
+  it('finds nothing in a list without it', () => {
+    expect(findRunning('  1 /sbin/launchd\n  505 /usr/bin/pgrep\n  506 /tmp/Telegraph.app.installing/Contents/MacOS/Telegraph')).toEqual([])
+    expect(findRunning('')).toEqual([])
+  })
+})
+
+describe('launchExactly', () => {
+  const destination = '/Applications/Telegraph.app'
+
+  function trying({ opens, runs }) {
+    const calls = []
+    let asked = 0
+    return {
+      calls,
+      tools: {
+        open: (path) => {
+          calls.push(`open ${path}`)
+          if (!opens) throw new Error('open failed')
+        },
+        start: (path) => calls.push(`start ${path}`),
+        running: () => runs(asked++),
+        sleep: async () => {}
+      }
+    }
+  }
+
+  it('opens the app and makes sure that it is the one that runs', async () => {
+    const { calls, tools } = trying({ opens: true, runs: (asked) => (asked < 2 ? [] : [destination]) })
+    expect(await launchExactly(destination, tools)).toBe('opened')
+    expect(calls).toEqual([`open ${destination}`])
+  })
+
+  it('starts the app itself when opening it did not start it', async () => {
+    const { calls, tools } = trying({ opens: true, runs: () => [] })
+    expect(await launchExactly(destination, tools)).toBe('started')
+    expect(calls).toEqual([`open ${destination}`, `start ${destination}`])
+  })
+
+  it('starts the app itself when it cannot be opened', async () => {
+    const { calls, tools } = trying({ opens: false, runs: () => [] })
+    expect(await launchExactly(destination, tools)).toBe('started')
+    expect(calls).toEqual([`open ${destination}`, `start ${destination}`])
+  })
+
+  it('says so when another copy came up in its place', async () => {
+    const other = '/Users/someone/Projects/telegraph/dist/mac-arm64/Telegraph.app'
+    const { calls, tools } = trying({ opens: true, runs: () => [other] })
+    expect(await launchExactly(destination, tools)).toBe('another')
+    expect(calls).toEqual([`open ${destination}`])
   })
 })

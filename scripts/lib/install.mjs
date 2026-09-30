@@ -1,5 +1,5 @@
 // Puts a newly built app in the place of the installed one.
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 
@@ -10,16 +10,62 @@ function copyApp(from, to) {
   cpSync(from, to, { recursive: true, verbatimSymlinks: true })
 }
 
-/** True while the app at the path, or any part of it, is running. */
+// By the program alone, without what it was started with: a command that only names Telegraph is not Telegraph.
+const MAIN_PROCESS = /^\s*\d+\s+(\/.*\/Telegraph\.app)\/Contents\/MacOS\/Telegraph$/
+const LAUNCH_CHECKS = 20
+const LAUNCH_CHECK_EVERY_MS = 500
+
+function listProcesses() {
+  return execFileSync('ps', ['-axo', 'pid=,comm='], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+}
+
+/**
+ * The copies of Telegraph that are running, each by the path of its app.
+ * Telegraph can run from more than one place: the one that was installed,
+ * and the one that was built, which macOS knows as the same app.
+ */
+export function findRunning(list = listProcesses()) {
+  return list.split('\n').flatMap((line) => MAIN_PROCESS.exec(line.trimEnd())?.[1] ?? [])
+}
+
+/** True while the app at the path is running. */
 export function isRunning(destination) {
   try {
-    // With the processes this one descends from: started in a session of
-    // Telegraph, this script is one of them, and would not see it otherwise.
-    execFileSync('pgrep', ['-a', '-f', `${destination}/Contents/MacOS/`], { stdio: 'ignore' })
-    return true
+    return findRunning().includes(destination)
   } catch {
-    return false
+    // Better taken for running, and left alone, than replaced while it runs.
+    return true
   }
+}
+
+const launching = {
+  // A new one of this very copy: macOS would otherwise bring up whichever copy it thinks of first.
+  open: (destination) => execFileSync('open', ['-n', destination], { stdio: 'ignore' }),
+  start: (destination) =>
+    spawn(`${destination}/Contents/MacOS/Telegraph`, [], { detached: true, stdio: 'ignore' }).unref(),
+  running: () => findRunning(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Starts the app at the path and makes sure it is that one that runs.
+ * Resolves to 'opened', to 'started' when macOS did not start it and it was
+ * started without its help, or to 'another' when a different copy came up.
+ */
+export async function launchExactly(destination, tools = launching) {
+  try {
+    tools.open(destination)
+    for (let check = 0; check < LAUNCH_CHECKS; check++) {
+      const running = tools.running()
+      if (running.includes(destination)) return 'opened'
+      if (running.length > 0) return 'another'
+      await tools.sleep(LAUNCH_CHECK_EVERY_MS)
+    }
+  } catch {
+    // Started below.
+  }
+  tools.start(destination)
+  return 'started'
 }
 
 /**

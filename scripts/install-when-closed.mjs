@@ -10,7 +10,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { isRunning, replaceApp, waitUntilClosed } from './lib/install.mjs'
+import { findRunning, launchExactly, replaceApp, waitUntilClosed } from './lib/install.mjs'
 
 const APP_NAME = 'Telegraph.app'
 const dist = join(import.meta.dirname, '..', 'dist')
@@ -27,7 +27,10 @@ const { values } = parseArgs({
   }
 })
 const destination = values.to
-const backup = join(dist, 'previous', APP_NAME)
+// In a folder Spotlight leaves alone: a second copy that can be found is a second copy that can be started.
+const backup = join(dist, 'previous.noindex', APP_NAME)
+const REGISTER =
+  '/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister'
 
 if (values.cancel) cancel()
 else if (values.waiting) await waitAndInstall()
@@ -71,8 +74,8 @@ function startWaiting() {
   child.unref()
   writeFileSync(pidPath, String(child.pid))
   console.log(
-    isRunning(destination)
-      ? `Waiting for Telegraph to be closed. Then ${destination} is replaced and opened again.`
+    anyRunning()
+      ? `Waiting for Telegraph to be closed. Then ${destination} is replaced and opened.`
       : `Telegraph is closed. Installing ${destination} now.`
   )
   console.log(`The app it replaces is kept in ${backup}. What happens is written to ${logPath}.`)
@@ -87,6 +90,24 @@ function cancel() {
   process.kill(pid)
   rmSync(pidPath, { force: true })
   console.log('Stopped waiting. Nothing was installed.')
+}
+
+/** Telegraph counts as running wherever it runs from: the user may have started another copy than the installed one. */
+function anyRunning() {
+  try {
+    return findRunning().length > 0
+  } catch {
+    return true
+  }
+}
+
+/** Takes a copy of the app out of what macOS knows, so that it is not started in place of the installed one. */
+function forget(path) {
+  try {
+    execFileSync(REGISTER, ['-u', path], { stdio: 'ignore' })
+  } catch {
+    // It stays known, which the way the app is started makes up for.
+  }
 }
 
 function note(text) {
@@ -107,18 +128,28 @@ async function waitAndInstall() {
   const source = findPackaged()
   note(`waiting for ${destination} to be closed`)
   try {
-    if (!(await waitUntilClosed({ isRunning: () => isRunning(destination) }))) {
+    if (!(await waitUntilClosed({ isRunning: anyRunning }))) {
       note('gave up: Telegraph was not closed within a day')
       return
     }
     note(`closed, installing ${source}`)
     replaceApp({ source, destination, backup })
     note('installed')
-    if (!values['no-open']) execFileSync('open', [destination])
+    // The copy that was built has done its part. Left behind, it is an app like the installed one.
+    rmSync(source, { recursive: true, force: true })
+    forget(source)
+    forget(backup)
+    forget(join(dist, 'previous', APP_NAME))
+    rmSync(join(dist, 'previous'), { recursive: true, force: true })
+    if (!values['no-open']) {
+      const how = await launchExactly(destination)
+      note(`${how}: ${findRunning().join(', ') || 'nothing runs yet'}`)
+      if (how === 'another') tell(`Another copy of Telegraph came up than the new one in ${destination}. Close it and open that one.`)
+    }
   } catch (error) {
     note(`failed: ${error instanceof Error ? error.stack : String(error)}`)
     if (!values['no-open']) {
-      if (existsSync(destination)) execFileSync('open', [destination])
+      if (existsSync(destination)) await launchExactly(destination).catch(() => {})
       tell(
         `The new Telegraph could not be installed, and the one you had is still there. ${error instanceof Error ? error.message : error}`
       )
