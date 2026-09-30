@@ -17,6 +17,7 @@ import {
   type IpcMainInvokeEvent
 } from 'electron'
 import { checkWindowReport, describeProblem, type LogEntry } from '@shared/buglog'
+import { DEFAULT_THEME, THEMES, type ThemeName } from '@shared/themes'
 import { withReporting } from '@shared/usage'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
@@ -73,6 +74,7 @@ const attachments = new Attachments({
 })
 
 let window: BrowserWindow | null = null
+let theme: ThemeName = DEFAULT_THEME
 let quitConfirmed = false
 let pageReports = false
 
@@ -229,6 +231,12 @@ function registerIpc(
 
   listen(IPC.setBadge, (count: unknown) => notifier.badge(count))
 
+  ipcMain.on(IPC.theme, (event) => {
+    event.returnValue = isTrusted(event) ? store.get().theme : DEFAULT_THEME
+  })
+
+  listen(IPC.setTheme, (chosen: unknown) => applyTheme(store, chosen))
+
   handle(IPC.readUsage, async () => ({
     ...meters.read(),
     days: await readDays(),
@@ -296,6 +304,18 @@ function registerIpc(
   listen(IPC.reporting, () => {
     pageReports = true
   })
+}
+
+/** Keeps the theme, colours the window behind the page with it, and tells the page and the menu. */
+function applyTheme(store: StateStore, chosen: unknown): void {
+  const found = THEMES.find((candidate) => candidate.name === chosen)
+  if (!found) return
+  store.saveTheme(found.name)
+  theme = found.name
+  if (window && !window.isDestroyed()) window.setBackgroundColor(found.background)
+  const item = Menu.getApplicationMenu()?.getMenuItemById(`theme-${found.name}`)
+  if (item) item.checked = true
+  send(IPC.themeChanged, found.name)
 }
 
 /**
@@ -380,7 +400,8 @@ function createWindow(): void {
     minHeight: 440,
     show: false,
     title: 'Telegraph',
-    backgroundColor: '#15202a',
+    // The page is not drawn yet: the window is of the colour it will be, so that it does not flash.
+    backgroundColor: THEMES.find((candidate) => candidate.name === theme)?.background,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 18, y: 19 },
     webPreferences: {
@@ -426,7 +447,11 @@ function createWindow(): void {
   })
 
   // The page that is going can still tell of its sessions ending, after it was cleared up behind.
-  created.webContents.on('did-finish-load', () => notifier.clear())
+  created.webContents.on('did-finish-load', () => {
+    notifier.clear()
+    // A theme chosen while the page was loading was told of before it could hear it.
+    send(IPC.themeChanged, theme)
+  })
 
   created.webContents.setWindowOpenHandler(({ url }) => {
     openInBrowser(url)
@@ -473,6 +498,7 @@ if (!app.requestSingleInstanceLock()) {
       bugLog.record({ kind: 'state-unreadable', ...describeProblem(error), detail: { backupPath } })
     )
     const { launchers } = store.get()
+    theme = store.get().theme
     const installed = findInstalled(
       launchers,
       process.env.SHELL,
@@ -492,7 +518,9 @@ if (!app.requestSingleInstanceLock()) {
           launchers: offered,
           includeDeveloperTools: !app.isPackaged,
           send: sendMenuCommand,
-          showBugLog
+          showBugLog,
+          theme,
+          setTheme: (chosen) => applyTheme(store, chosen)
         })
       )
     setMenu(launchers)

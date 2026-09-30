@@ -1,9 +1,11 @@
 import { STATUS_LABELS } from '@shared/status'
 import type { GitStatus, Launcher, Project } from '@shared/types'
-import { activateSession, addProject, endSession, selectProject } from '../controller'
+import { THEMES, type ThemeName } from '@shared/themes'
+import { activateSession, addProject, chooseTheme, endSession, selectProject } from '../controller'
 import { describeGit } from '../format'
 import { modelOf, sessionLabel, type AppState, type SessionView } from '../store'
 import { ProjectMenu } from './ProjectMenu'
+import { Select } from './Select'
 import { Signal } from './Signal'
 
 export function Sidebar({ state }: { state: AppState }) {
@@ -28,6 +30,14 @@ export function Sidebar({ state }: { state: AppState }) {
         <button type="button" className="quiet-button" onClick={() => void addProject()}>
           Add project
         </button>
+        <span className="theme-choice">
+          <Select
+            label="Theme"
+            value={state.theme}
+            options={THEMES.map(({ name, label }) => ({ value: name, label }))}
+            onChange={(theme) => chooseTheme(theme as ThemeName)}
+          />
+        </span>
       </div>
     </aside>
   )

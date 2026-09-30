@@ -1,5 +1,6 @@
 import { Menu, type MenuItemConstructorOptions } from 'electron'
 import { CLAUDE_LAUNCHER_ID, SHELL_LAUNCHER_ID } from '@shared/launchers'
+import { THEMES, type ThemeName } from '@shared/themes'
 import type { Launcher, MenuCommand } from '@shared/types'
 
 const LAUNCHER_SHORTCUTS: Record<string, string> = {
@@ -14,10 +15,12 @@ export interface MenuOptions {
   includeDeveloperTools: boolean
   send(command: MenuCommand): void
   showBugLog(): void
+  theme: ThemeName
+  setTheme(theme: ThemeName): void
 }
 
 export function buildMenu(options: MenuOptions): Menu {
-  const { launchers, includeDeveloperTools, send, showBugLog } = options
+  const { launchers, includeDeveloperTools, send, showBugLog, theme, setTheme } = options
   const startItems: MenuItemConstructorOptions[] = launchers.map((launcher) => ({
     label: `Start ${launcher.name}`,
     accelerator: LAUNCHER_SHORTCUTS[launcher.id],
@@ -80,6 +83,16 @@ export function buildMenu(options: MenuOptions): Menu {
           label: 'Sessions Side by Side',
           accelerator: 'CmdOrCtrl+Shift+G',
           click: () => send({ type: 'toggle-layout' })
+        },
+        {
+          label: 'Theme',
+          submenu: THEMES.map(({ name, label }) => ({
+            id: `theme-${name}`,
+            label,
+            type: 'radio' as const,
+            checked: name === theme,
+            click: () => setTheme(name)
+          }))
         },
         { role: 'togglefullscreen' },
         ...(includeDeveloperTools

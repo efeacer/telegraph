@@ -1,5 +1,6 @@
 import type { WindowReport } from './buglog'
 import type { Notice } from './notices'
+import type { ThemeName } from './themes'
 
 export interface Project {
   id: string
@@ -147,6 +148,7 @@ export interface PersistedState {
   launchers: Launcher[]
   /** What was last chosen in each project, by the id of the project. */
   choices: Record<string, Choice>
+  theme: ThemeName
 }
 
 export interface CreateSessionRequest {
@@ -175,6 +177,11 @@ export type MenuCommand =
 export interface TelegraphApi {
   /** True when the app runs under the end-to-end tests. */
   e2e: boolean
+  /** The theme the window starts in, known before it draws anything. */
+  theme: ThemeName
+  setTheme(theme: ThemeName): void
+  /** Called when the theme has changed, from the window or from the menu. */
+  onThemeChanged(listener: (theme: ThemeName) => void): () => void
   loadState(): Promise<PersistedState>
   addProject(): Promise<Project | null>
   removeProject(projectId: string): Promise<void>

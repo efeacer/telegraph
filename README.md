@@ -43,6 +43,11 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Themes
+
+Night, Dark, Light and Creme, chosen at the foot of the sidebar or in
+View > Theme. The terminals change with the window.
+
 ## The model of a session
 
 Every session shows its model in the sidebar and in its tile. For a Claude

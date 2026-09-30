@@ -2,6 +2,7 @@ import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
 import { describeNotice, noticeFor, type NoticeKind } from '@shared/notices'
 import { escapePath } from '@shared/paths'
+import type { ThemeName } from '@shared/themes'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
 import type { Chat, Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
@@ -25,10 +26,13 @@ const USAGE_REFRESH_INTERVAL_MS = 30_000
 const SESSION_ENDED_NOTE = '\r\n\x1b[2mSession ended.\x1b[0m\r\n'
 
 const api = window.telegraph
-const terminals = new TerminalManager({ useGpu: !api.e2e })
+const terminals = new TerminalManager({ useGpu: !api.e2e, theme: api.theme })
 const statuses = new Map<string, StatusState>()
 /** Sessions into which something has been typed and not yet sent. */
 const drafting = new Set<string>()
+
+// From the start: the theme can be chosen in the menu before the window has drawn anything.
+api.onThemeChanged(showTheme)
 
 export function attachTerminalHost(host: HTMLElement): void {
   terminals.attach(host)
@@ -37,6 +41,17 @@ export function attachTerminalHost(host: HTMLElement): void {
 /** Puts the terminal of a session into its tile, or out of sight when it has none. */
 export function placeTerminal(sessionId: string, container: HTMLElement | null): void {
   terminals.place(sessionId, container)
+}
+
+/** Asks for a theme, which the main process keeps and tells of back. */
+export function chooseTheme(theme: ThemeName): void {
+  api.setTheme(theme)
+}
+
+function showTheme(theme: ThemeName): void {
+  document.documentElement.dataset.theme = theme
+  terminals.setTheme(theme)
+  setState((state) => ({ ...state, theme }))
 }
 
 /** Changes between one session at a time and all of them side by side. */

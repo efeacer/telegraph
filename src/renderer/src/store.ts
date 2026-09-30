@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { SessionStatus } from '@shared/status'
+import type { ThemeName } from '@shared/themes'
 import type { Catalogue, Choice, GitStatus, Launcher, Model, Project, Usage } from '@shared/types'
 
 export interface SessionView {
@@ -53,6 +54,7 @@ export interface AppState {
   selectedProjectId: string | null
   /** One session at a time, or all of them side by side. */
   layout: Layout
+  theme: ThemeName
   error: string | null
   reportingBug: boolean
 }
@@ -69,6 +71,7 @@ let state: AppState = {
   activeSessionId: null,
   selectedProjectId: null,
   layout: lastLayout(),
+  theme: window.telegraph.theme,
   error: null,
   reportingBug: false
 }

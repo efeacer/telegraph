@@ -22,7 +22,8 @@ describe('StateStore', () => {
     expect(new StateStore(filePath).get()).toEqual({
       projects: [],
       launchers: DEFAULT_LAUNCHERS,
-      choices: {}
+      choices: {},
+      theme: 'night'
     })
   })
 

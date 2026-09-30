@@ -4,7 +4,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE, TERMINAL_THEME } from './theme'
+import { TERMINAL_THEMES, type ThemeName } from '@shared/themes'
+import { TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE } from './theme'
 
 // What agents read as "insert a line break" rather than "send".
 const LINE_BREAK = '\x1b\r'
@@ -33,6 +34,7 @@ interface TerminalView {
 export interface TerminalOptions {
   /** The GPU renderer draws to a canvas, which leaves tests nothing to read. */
   useGpu: boolean
+  theme: ThemeName
 }
 
 /**
@@ -46,8 +48,17 @@ export class TerminalManager {
   private host: HTMLElement | null = null
   private resizeObserver: ResizeObserver | null = null
   private fitScheduled = false
+  private theme: ThemeName
 
-  constructor(private readonly options: TerminalOptions) {}
+  constructor(private readonly options: TerminalOptions) {
+    this.theme = options.theme
+  }
+
+  /** Colours every terminal anew, and those to come. */
+  setTheme(theme: ThemeName): void {
+    this.theme = theme
+    for (const view of this.views.values()) view.terminal.options.theme = TERMINAL_THEMES[theme]
+  }
 
   attach(host: HTMLElement): void {
     this.host = host
@@ -84,7 +95,7 @@ export class TerminalManager {
       cursorStyle: 'bar',
       cursorInactiveStyle: 'outline',
       scrollback: 10_000,
-      theme: TERMINAL_THEME,
+      theme: TERMINAL_THEMES[this.theme],
       // Option stays a character key: many keyboard layouts need it to type
       // brackets, braces and the pipe.
       macOptionIsMeta: false

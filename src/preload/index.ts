@@ -13,6 +13,10 @@ function subscribe<Args extends unknown[]>(
 
 const api: TelegraphApi = {
   e2e: process.argv.includes(E2E_ARGUMENT),
+  // Asked for once and at once, so that the window is never drawn in the wrong colours.
+  theme: ipcRenderer.sendSync(IPC.theme),
+  setTheme: (theme) => ipcRenderer.send(IPC.setTheme, theme),
+  onThemeChanged: (listener) => subscribe(IPC.themeChanged, listener),
   loadState: () => ipcRenderer.invoke(IPC.loadState),
   addProject: () => ipcRenderer.invoke(IPC.addProject),
   removeProject: (projectId) => ipcRenderer.invoke(IPC.removeProject, projectId),

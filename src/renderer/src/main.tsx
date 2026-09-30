@@ -27,6 +27,9 @@ async function loadTerminalFonts(): Promise<void> {
   )
 }
 
+// Before anything is drawn, so that nothing is drawn in the colours of another theme.
+document.documentElement.dataset.theme = window.telegraph.theme
+
 async function start(): Promise<void> {
   await loadTerminalFonts()
   createRoot(document.getElementById('root')!, {

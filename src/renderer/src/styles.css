@@ -2,10 +2,14 @@
  * Telegraph's look comes from the telegraph line: slate night sky, the pale
  * aqua of glass insulators, brass instruments and paper tape. Sessions hang
  * on a wire under their project, and each one keys its state as a mark.
+ *
+ * The colours are named after the Night theme, the first: --night is the
+ * colour of the sidebar and the header in every theme, --paper that of text,
+ * --well that of the terminals. The terminals take theirs from
+ * src/shared/themes.ts, which is kept in step with these.
  */
 
 :root {
-  /* Keep the terminal colours in theme.ts in step with these. */
   --night: #15202a;
   --night-raised: #1c2a36;
   --night-pressed: #223341;
@@ -17,7 +21,13 @@
   --glass: #7fd1c4;
   --glass-dim: #2f5561;
   --brass: #dba544;
+  --brass-dim: #5b4a26;
   --stop: #e5604d;
+  --stop-dim: #5e2f2a;
+  --on-stop: #ffffff;
+  --column: #64788a;
+  --shadow: rgba(6, 11, 16, 0.55);
+  --scrim: rgba(6, 11, 16, 0.55);
 
   --sidebar-width: 272px;
   --titlebar-height: 52px;
@@ -35,6 +45,95 @@
   color: var(--paper);
   background: var(--night);
   -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme='night'] {
+  --night: #15202a;
+  --night-raised: #1c2a36;
+  --night-pressed: #223341;
+  --well: #0e171f;
+  --wire: #3d5161;
+  --wire-faint: #25343f;
+  --paper: #ebe3cf;
+  --slate: #8a9caa;
+  --glass: #7fd1c4;
+  --glass-dim: #2f5561;
+  --brass: #dba544;
+  --brass-dim: #5b4a26;
+  --stop: #e5604d;
+  --stop-dim: #5e2f2a;
+  --on-stop: #ffffff;
+  --column: #64788a;
+  --shadow: rgba(6, 11, 16, 0.55);
+  --scrim: rgba(6, 11, 16, 0.55);
+}
+
+/* Graphite, without the blue of the night sky. */
+:root[data-theme='dark'] {
+  --night: #1b1b1e;
+  --night-raised: #232326;
+  --night-pressed: #2c2c30;
+  --well: #121214;
+  --wire: #48484f;
+  --wire-faint: #2c2c31;
+  --paper: #e8e6e1;
+  --slate: #9d9ca3;
+  --glass: #74cdbd;
+  --glass-dim: #2c4a45;
+  --brass: #dcaa4b;
+  --brass-dim: #4e4024;
+  --stop: #e8705e;
+  --stop-dim: #512c27;
+  --on-stop: #ffffff;
+  --column: #6c6c75;
+  --shadow: rgba(0, 0, 0, 0.55);
+  --scrim: rgba(0, 0, 0, 0.5);
+}
+
+/* Paper in daylight. The marks are a darker glass, brass and red, to be seen on white. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --night: #eef0f3;
+  --night-raised: #ffffff;
+  --night-pressed: #e1e5ea;
+  --well: #fbfbfc;
+  --wire: #b9c1ca;
+  --wire-faint: #dde2e8;
+  --paper: #1b2430;
+  --slate: #56626f;
+  --glass: #15776a;
+  --glass-dim: #c4e4dd;
+  --brass: #976300;
+  --brass-dim: #efdfbf;
+  --stop: #c33d2a;
+  --stop-dim: #f2d0c9;
+  --on-stop: #ffffff;
+  --column: #a4aeb9;
+  --shadow: rgba(24, 34, 46, 0.16);
+  --scrim: rgba(24, 34, 46, 0.28);
+}
+
+/* Telegram forms and paper tape, warm and a little worn. */
+:root[data-theme='creme'] {
+  color-scheme: light;
+  --night: #f1e8d6;
+  --night-raised: #faf5ea;
+  --night-pressed: #e6dac1;
+  --well: #faf4e6;
+  --wire: #c6b590;
+  --wire-faint: #e2d5b8;
+  --paper: #34291f;
+  --slate: #6d5d49;
+  --glass: #236f64;
+  --glass-dim: #cbe0d4;
+  --brass: #8d5f0c;
+  --brass-dim: #ebd9b0;
+  --stop: #b03f2b;
+  --stop-dim: #efcdc0;
+  --on-stop: #ffffff;
+  --column: #b8a57f;
+  --shadow: rgba(62, 44, 22, 0.16);
+  --scrim: rgba(62, 44, 22, 0.28);
 }
 
 *,
@@ -365,9 +464,6 @@ button:focus-visible {
   text-align: left;
 }
 
-.sidebar-foot .quiet-button {
-  width: 100%;
-}
 
 .quiet-button:hover {
   color: var(--paper);
@@ -397,7 +493,7 @@ button:focus-visible {
   border: 1px solid var(--wire);
   border-radius: 8px;
   background: var(--night-raised);
-  box-shadow: 0 12px 28px rgba(6, 11, 16, 0.55);
+  box-shadow: 0 12px 28px var(--shadow);
 }
 
 .menu-item {
@@ -757,11 +853,11 @@ button:focus-visible {
   border-radius: 10px;
   color: var(--paper);
   background: var(--night-raised);
-  box-shadow: 0 24px 56px rgba(6, 11, 16, 0.6);
+  box-shadow: 0 24px 56px var(--shadow);
 }
 
 .dialog::backdrop {
-  background: rgba(6, 11, 16, 0.55);
+  background: var(--scrim);
 }
 
 .dialog h1 {
@@ -942,7 +1038,7 @@ button:focus-visible {
   font-stretch: 92%;
   list-style: none;
   background: var(--night-raised);
-  box-shadow: 0 12px 28px rgba(6, 11, 16, 0.55);
+  box-shadow: 0 12px 28px var(--shadow);
   scrollbar-width: thin;
   scrollbar-color: var(--wire) transparent;
 }
@@ -1013,13 +1109,6 @@ button:focus-visible {
  * plenty, brass when it runs low, red when it is nearly gone.
  */
 
-:root {
-  /* The unfilled part of a dial, a dimmer step of what fills it. */
-  --brass-dim: #5b4a26;
-  --stop-dim: #5e2f2a;
-  /* The days before today, which today stands out from. */
-  --column: #64788a;
-}
 
 .stage {
   position: relative;
@@ -1104,7 +1193,7 @@ button:focus-visible {
   border: 1px solid var(--wire);
   border-radius: 10px;
   background: var(--night-raised);
-  box-shadow: 0 16px 36px rgba(6, 11, 16, 0.55);
+  box-shadow: 0 16px 36px var(--shadow);
   scrollbar-width: thin;
   scrollbar-color: var(--wire) transparent;
   user-select: text;
@@ -1323,7 +1412,7 @@ button:focus-visible {
   font-stretch: 100%;
   line-height: 17px;
   text-align: center;
-  color: #fff;
+  color: var(--on-stop);
   background: var(--stop);
 }
 
@@ -1378,4 +1467,40 @@ button:focus-visible {
   .tile-model {
     display: none;
   }
+}
+
+/* The choice of theme, at the foot of the sidebar. Its list opens upwards, into the room there is. */
+.sidebar-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-foot .quiet-button {
+  flex: 1;
+}
+
+.theme-choice {
+  flex: none;
+  margin-right: 8px;
+  font-size: var(--text-small);
+}
+
+.theme-choice .blank-value {
+  font-weight: 500;
+  color: var(--slate);
+  border-bottom-color: var(--wire-faint);
+}
+
+.theme-choice .blank-value:hover,
+.theme-choice .blank-value[aria-expanded='true'] {
+  color: var(--paper);
+}
+
+.theme-choice .blank-list {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: auto;
+  right: -6px;
+  min-width: 140px;
 }
