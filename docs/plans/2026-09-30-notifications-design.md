@@ -46,6 +46,18 @@ All of it goes through what Electron offers on every system, so nothing here
 is of one system alone. Windows needs an app to say what it is called before
 it shows its notices, which Telegraph does at start.
 
+## Permission on macOS
+
+macOS asks the user once whether an app may show notices. It knows an app by
+how it is signed, and Telegraph is signed without an identity, which makes
+every build an app of its own: the permission is tied to the hash of the
+build. So macOS is likely to ask again after each update. Signing every
+build with one certificate, even one made on this Mac, would end that.
+
+Until the user has answered, a notice is neither shown nor refused, and
+Electron says nothing of it. The marks in the window and the count do not
+depend on it.
+
 ## What this does not do
 
 - It does not reach a phone, or a computer other than the one Telegraph runs
