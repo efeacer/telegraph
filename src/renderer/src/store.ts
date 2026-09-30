@@ -11,6 +11,8 @@ export interface SessionView {
   /** Title the running program has set for its terminal, if any. */
   title: string | null
   status: SessionStatus
+  /** Something happened in the session that the user has not seen yet. */
+  unread: boolean
 }
 
 export interface AppState {

@@ -43,6 +43,13 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Notifications
+
+When a session you are not looking at stops working, rings its bell or ends,
+Telegraph shows a notification, counts it on its icon, and marks the session
+in red until you go to it. Pressing the notification takes you there. This
+works for any program, since it goes by what the terminal sees.
+
 ## What was used
 
 The mark in the top right corner shows how much of the 5-hour limit of your

@@ -1,10 +1,11 @@
 import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
+import { describeNotice, noticeFor, type NoticeKind } from '@shared/notices'
 import { escapePath } from '@shared/paths'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
 import type { Chat, Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
-import { getState, orderedSessions, setState, type SessionView } from './store'
+import { getState, orderedSessions, sessionLabel, setState, type SessionView } from './store'
 import { TerminalManager } from './terminals'
 
 const TICK_INTERVAL_MS = 500
@@ -36,6 +37,7 @@ export async function initialize(): Promise<void> {
   api.onMenuCommand(handleMenuCommand)
   api.onProblem((message) => setState((state) => ({ ...state, error: message })))
   api.onUsageChanged(() => void refreshUsage())
+  api.onOpenSession(activateSession)
 
   const persisted = await api.loadState()
   // Null when it cannot be told, in which case every launcher is offered.
@@ -181,7 +183,8 @@ export async function startSession(
     launcherName: launcher.name,
     model,
     title: null,
-    status: 'idle'
+    status: 'idle',
+    unread: false
   }
   setState((state) => ({ ...state, sessions: [...state.sessions, session], error: null }))
   activateSession(sessionId)
@@ -319,6 +322,9 @@ function discardSession(sessionId: string): void {
     sessions: state.sessions.filter((session) => session.id !== sessionId),
     activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId
   }))
+  // Nothing is left of it to tell of.
+  api.withdrawNotice(sessionId)
+  countUnread()
 
   if (before.activeSessionId !== sessionId) return
   if (neighbour) {
@@ -347,7 +353,38 @@ function track(sessionId: string, event: StatusEvent): void {
   if (!previous) return
   const next = reduceStatus(previous, event)
   statuses.set(sessionId, next)
-  if (next.status !== previous.status) updateSession(sessionId, { status: next.status })
+  if (next.status !== previous.status) {
+    updateSession(sessionId, { status: next.status })
+    const kind = noticeFor(previous.status, next.status, isWatched(sessionId))
+    if (kind) tell(sessionId, kind)
+  }
+  // Looked at or typed into by the user, who has now seen what there was to see.
+  if ((event.type === 'focus' || event.type === 'input') && isWatched(sessionId)) seen(sessionId)
+}
+
+/** Tells the user of a session they are not looking at, and marks it until they do. */
+function tell(sessionId: string, kind: NoticeKind): void {
+  const state = getState()
+  const session = state.sessions.find((candidate) => candidate.id === sessionId)
+  const project = state.projects.find((candidate) => candidate.id === session?.projectId)
+  if (!session || !project) return
+  updateSession(sessionId, { unread: true })
+  countUnread()
+  api.notify({
+    sessionId,
+    ...describeNotice(kind, { session: sessionLabel(session), project: project.name })
+  })
+}
+
+function seen(sessionId: string): void {
+  if (!getState().sessions.some((session) => session.id === sessionId && session.unread)) return
+  updateSession(sessionId, { unread: false })
+  api.withdrawNotice(sessionId)
+  countUnread()
+}
+
+function countUnread(): void {
+  api.setBadge(getState().sessions.filter((session) => session.unread).length)
 }
 
 function tick(): void {

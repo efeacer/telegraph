@@ -43,6 +43,7 @@ interface ProjectGroupProps {
 
 function ProjectGroup(props: ProjectGroupProps) {
   const { project, launchers, git, sessions, activeSessionId, selected } = props
+  const unread = sessions.filter((session) => session.unread).length
   return (
     <section className={selected ? 'project is-selected' : 'project'}>
       <div className="project-head">
@@ -52,7 +53,14 @@ function ProjectGroup(props: ProjectGroupProps) {
           title={project.path}
           onClick={() => selectProject(project.id)}
         >
-          <span className="project-title">{project.name}</span>
+          <span className="project-title">
+            {project.name}
+            {unread > 0 && (
+              <span className="project-badge" aria-label={`${unread} with something new`}>
+                {unread}
+              </span>
+            )}
+          </span>
           {git && <span className="project-branch">{describeGit(git)}</span>}
         </button>
         <ProjectMenu project={project} launchers={launchers} hasSessions={sessions.length > 0} />
@@ -83,6 +91,7 @@ function SessionRow({ session, active }: { session: SessionView; active: boolean
           <span className="session-title">{label}</span>
           <span className="session-status">{STATUS_LABELS[session.status]}</span>
         </span>
+        {session.unread && <span className="session-badge" role="img" aria-label="Something new" />}
       </button>
       <button
         type="button"

@@ -1,4 +1,5 @@
 import type { WindowReport } from './buglog'
+import type { Notice } from './notices'
 
 export interface Project {
   id: string
@@ -182,6 +183,14 @@ export interface TelegraphApi {
   /** The chats a launcher has had in a project, the latest first. None if it keeps none. */
   listChats(projectId: string, launcherId: string): Promise<Chat[]>
   readUsage(): Promise<Usage>
+  /** Tells the user, by a notice of the system, of a session they are not looking at. */
+  notify(notice: Notice): void
+  /** Takes back the notice of a session the user has gone to. */
+  withdrawNotice(sessionId: string): void
+  /** Marks the icon of the app with how many sessions have something to tell. */
+  setBadge(count: number): void
+  /** Called with the session whose notice the user pressed. */
+  onOpenSession(listener: (sessionId: string) => void): () => void
   /** Called when a session has reported, so that what was used can be read again. */
   onUsageChanged(listener: () => void): () => void
   gitStatus(projectPath: string): Promise<GitStatus | null>

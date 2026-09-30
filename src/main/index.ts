@@ -5,10 +5,12 @@ import { pathToFileURL } from 'node:url'
 import {
   BrowserWindow,
   Menu,
+  Notification,
   app,
   crashReporter,
   dialog,
   ipcMain,
+  nativeImage,
   net,
   shell,
   type IpcMainEvent,
@@ -26,6 +28,7 @@ import { readGitStatus } from './git'
 import { findInstalled } from './installed'
 import { TokenLedger } from './ledger'
 import { Meters, hasOwnStatusLine } from './meters'
+import { Notifier, type NotifierTools } from './notifier'
 import { buildMenu } from './menu'
 import { PtyManager } from './pty'
 import { buildSessionEnv } from './shell'
@@ -78,6 +81,68 @@ const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'
 const meters = new Meters({ directory: join(app.getPath('userData'), 'usage') })
 // Sessions report several times a second while agents work, and the window asks each time.
 const ledger = new TokenLedger({ configDir: claudeConfigDir, freshForMs: 5_000 })
+// Windows shows a notice only of an app that has said what it is called.
+if (process.platform === 'win32') app.setAppUserModelId('dev.efeacer.telegraph')
+
+// Windows has no count on the icon of an app, but takes a small picture to lay over it.
+const WAITING_MARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAx0lEQVR42t2Xuw3EIAxAmYkZaK+lvpJl2Mo7MEEKdkDiXDjS6eSLSEJsJ8VrUMCPT8B2y/vlNHF3EwhIRgCpSCMqtWX6ZrpAQgrSBynU57SAp5n1gwCNcUgg0vL2kzQaa5dAnBD4lzgq4CfNnFsJPyIAFwT/PhObAunC4CtpS6AICJR/AkEg+ErgBLKgQOYEQFAAOIEqKFA5gSYo0EwKqG+B+iFU/w3VLyL1q9jEY6T+HJtISNRTMhNJqYm03ERhYqY0e251/AGyza5RMEXXjwAAAABJRU5ErkJggg=='
+
+/** The ways the system tells the user of something, which differ from one system to the next. */
+const systemNotices: NotifierTools = {
+  supported: () => Notification.isSupported(),
+  create: (options) => {
+    const notification = new Notification(options)
+    // A window that is not in front can ask for a look, where the system has a way to.
+    if (process.platform !== 'darwin' && window && !window.isFocused()) window.flashFrame(true)
+    return {
+      show: () => notification.show(),
+      close: () => notification.close(),
+      onClick: (listener) => void notification.on('click', listener)
+    }
+  },
+  setBadge: (count) => {
+    if (process.platform !== 'win32') {
+      app.setBadgeCount(count)
+    } else if (window && !window.isDestroyed()) {
+      const mark = count > 0 ? nativeImage.createFromDataURL(WAITING_MARK) : null
+      window.setOverlayIcon(mark, count > 0 ? `${count} waiting` : '')
+    }
+  }
+}
+
+/**
+ * Under test the notices are kept and not shown: the tests run while the user
+ * is at work, and would cover the screen with notices that are none.
+ */
+function recordedNotices(): NotifierTools {
+  const kept: { title: string; body: string; closed: boolean; press(): void }[] = []
+  Object.assign(globalThis, { telegraphNotices: kept, telegraphBadge: 0 })
+  return {
+    supported: () => true,
+    create: (options) => {
+      const notice = { ...options, closed: false, press: () => {} }
+      kept.push(notice)
+      return {
+        show: () => {},
+        close: () => void (notice.closed = true),
+        onClick: (listener) => void (notice.press = listener)
+      }
+    },
+    setBadge: (count) => void Object.assign(globalThis, { telegraphBadge: count })
+  }
+}
+
+const notifier = new Notifier(isE2E ? recordedNotices() : systemNotices, (sessionId) => {
+  // Brought to the front, which under test would take the keys from the user.
+  if (window && !isE2E) {
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
+  }
+  send(IPC.openSession, sessionId)
+})
+
 let readingDays: ReturnType<TokenLedger['read']> | null = null
 
 /** One reading at a time: the ledger reads on from where it was, and two readers would count twice. */
@@ -157,6 +222,12 @@ function registerIpc(
     if (!project || launcher?.chats?.kind !== 'claude') return []
     return listChats({ configDir: claudeConfigDir, projectPath: project.path })
   })
+
+  listen(IPC.notify, (notice: unknown) => notifier.notify(notice))
+
+  listen(IPC.withdrawNotice, (sessionId: unknown) => notifier.withdraw(sessionId))
+
+  listen(IPC.setBadge, (count: unknown) => notifier.badge(count))
 
   handle(IPC.readUsage, async () => ({
     ...meters.read(),
@@ -341,6 +412,9 @@ function createWindow(): void {
   created.on('closed', () => {
     window = null
   })
+
+  // Asked for a look by a notice, and looked at now.
+  created.on('focus', () => created.flashFrame(false))
 
   // A reloaded page has lost track of its sessions, so they cannot be
   // reached any more and would keep running unseen.

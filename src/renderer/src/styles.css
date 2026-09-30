@@ -1129,3 +1129,43 @@ button:focus-visible {
   gap: 8px;
   margin: 7px 0 4px;
 }
+
+/*
+ * Something new
+ *
+ * A session that has something to tell is marked in red until the user goes
+ * to it, and its project says how many there are.
+ */
+
+.session-badge {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  /* At the end of the row, where the eye finds it whatever the session is called. */
+  margin: 0 8px 0 auto;
+  border-radius: 50%;
+  background: var(--stop);
+  /* Stands off from the row it lies on, whichever shade that has. */
+  box-shadow: 0 0 0 2px var(--row, var(--night));
+}
+
+.project-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-badge {
+  flex: none;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 650;
+  font-stretch: 100%;
+  line-height: 17px;
+  text-align: center;
+  color: #fff;
+  background: var(--stop);
+}
