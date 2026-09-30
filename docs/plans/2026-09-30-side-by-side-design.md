@@ -31,7 +31,14 @@ window remembers which it was left in. The sidebar stays in both.
 - The tile the keys go to is outlined. Pressing a tile, or its session in the
   sidebar, makes it that one.
 - While something is being chosen to start, the choice has the stage to
-  itself, as it does otherwise.
+  itself, as it does otherwise. The tiles stay underneath, so that no
+  terminal is told of a new size for it.
+- The tile that has the keys is the one in front, however the keys got
+  there. Ending another tile leaves them where they are.
+- A tile is never smaller than a program can draw itself in. With more
+  sessions than fit, the stage scrolls.
+- From the thirteenth terminal on, the slower way of drawing is used: a
+  browser only draws so many by GPU at once.
 
 ## Notices
 

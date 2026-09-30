@@ -67,6 +67,16 @@ describe('Notifier', () => {
     expect(() => notifier.withdraw(42)).not.toThrow()
   })
 
+  it('takes back everything when the window starts over', () => {
+    const { notifier, banners, tools } = setup()
+    notifier.notify(notice(FIRST))
+    notifier.notify(notice(SECOND))
+    notifier.clear()
+    expect(banners.map((banner) => banner.closed)).toEqual([true, true])
+    expect(tools.setBadge).toHaveBeenLastCalledWith(0)
+    expect(() => notifier.clear()).not.toThrow()
+  })
+
   it('shows nothing of what is not a notice', () => {
     const { notifier, banners } = setup()
     notifier.notify({ sessionId: FIRST })

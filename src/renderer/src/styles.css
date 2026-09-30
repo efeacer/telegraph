@@ -538,10 +538,20 @@ button:focus-visible {
 
 .tiles.is-grid {
   gap: 1px;
+  /* No tile smaller than a program can draw itself in. With many sessions the stage scrolls. */
+  grid-auto-rows: minmax(150px, 1fr);
+  overflow: auto;
   background: var(--wire-faint);
+  scrollbar-width: thin;
+  scrollbar-color: var(--wire) transparent;
+}
+
+.tiles.is-covered {
+  visibility: hidden;
 }
 
 .tile {
+  container-type: inline-size;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -582,6 +592,19 @@ button:focus-visible {
   color: var(--slate);
   background: var(--night);
   white-space: nowrap;
+  overflow: hidden;
+}
+
+/* In a narrow tile the mark says what the session is doing, and the sidebar which project it is of. */
+@container (max-width: 330px) {
+  .tile-status,
+  .tile-project {
+    display: none;
+  }
+
+  .tile-title {
+    margin-right: auto;
+  }
 }
 
 .tile.is-active .tile-head {
@@ -602,7 +625,10 @@ button:focus-visible {
 }
 
 .tile-project {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tile-status {

@@ -43,10 +43,7 @@ export function toggleLayout(): void {
   setState((state) => ({ ...state, layout }))
   keepLayout(layout)
   // The keys go back to the session once it is in its new place, from the button that was pressed.
-  requestAnimationFrame(() => {
-    const { activeSessionId } = getState()
-    if (activeSessionId) terminals.focus(activeSessionId)
-  })
+  requestAnimationFrame(focusActive)
 }
 
 export async function initialize(): Promise<void> {
@@ -86,6 +83,8 @@ export async function initialize(): Promise<void> {
       setState((state) => ({ ...state, launchers: state.launchers.filter(offer(ids)) }))
     )
   }
+  // A window that starts over has nothing to tell of yet.
+  countUnread()
   // The list may have to come from the network, which nothing else waits for.
   void api
     .loadCatalogue()
@@ -294,7 +293,7 @@ export async function endSession(sessionId: string): Promise<void> {
   if (session.status !== 'exited') {
     const ended = await api.closeSession(sessionId)
     if (!ended) {
-      terminals.focus(sessionId)
+      focusActive()
       return
     }
   }
@@ -350,12 +349,19 @@ function discardSession(sessionId: string): void {
   api.withdrawNotice(sessionId)
   countUnread()
 
-  if (before.activeSessionId !== sessionId) return
+  // The session in front stays in front, and keeps the keys the button took.
+  if (before.activeSessionId !== sessionId) return focusActive()
   if (neighbour) {
     activateSession(neighbour.id)
   } else {
     terminals.show(null)
   }
+}
+
+function focusActive(): void {
+  const { activeSessionId, reportingBug } = getState()
+  // A note about a bug is being written, and has the keys.
+  if (activeSessionId && !reportingBug) terminals.focus(activeSessionId)
 }
 
 function updateSession(sessionId: string, changes: Partial<SessionView>): void {
@@ -395,7 +401,11 @@ function tell(sessionId: string, kind: NoticeKind): void {
   updateSession(sessionId, { unread: true })
   countUnread()
   // Side by side, the session is in plain view of a user who is at the window: the mark says enough.
-  if (state.layout === 'grid' && state.activeSessionId !== null && document.hasFocus()) return
+  if (state.layout === 'grid' && state.activeSessionId !== null && document.hasFocus()) {
+    // A notice from before would now say what is no longer so.
+    api.withdrawNotice(sessionId)
+    return
+  }
   api.notify({
     sessionId,
     ...describeNotice(kind, { session: sessionLabel(session), project: project.name })

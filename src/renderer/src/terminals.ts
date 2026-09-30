@@ -11,6 +11,8 @@ const LINE_BREAK = '\x1b\r'
 const KILL_LINE = '\x15'
 const LINE_START = '\x01'
 const LINE_END = '\x05'
+// Chromium keeps sixteen drawing contexts and drops the oldest beyond that.
+const GPU_TERMINALS = 12
 
 export interface TerminalHandlers {
   onInput(data: string): void
@@ -93,7 +95,8 @@ export class TerminalManager {
     terminal.unicode.activeVersion = '11'
     terminal.loadAddon(new WebLinksAddon((_event, url) => handlers.onLink(url)))
     terminal.open(element)
-    if (this.options.useGpu) loadGpuRenderer(terminal)
+    // Side by side, every terminal is drawn at once, and a browser only draws so many by GPU.
+    if (this.options.useGpu && this.views.size < GPU_TERMINALS) loadGpuRenderer(terminal)
     fit.fit()
 
     terminal.attachCustomKeyEventHandler((event) => handleKey(event, handlers.onInput))

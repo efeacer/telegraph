@@ -20,8 +20,7 @@ export function Stage({ state }: { state: AppState }) {
   const git = project ? state.git[project.id] : null
   const hasSessions = state.sessions.some((candidate) => candidate.projectId === project?.id)
   const sideBySide = state.layout === 'grid'
-  // While something is being chosen to start, the choice has the stage to itself.
-  const shown = !session ? [] : sideBySide ? orderedSessions(state) : [session]
+  const shown = sideBySide ? orderedSessions(state) : session ? [session] : []
   const { columns, spans } = arrange(shown.length)
 
   return (
@@ -82,8 +81,10 @@ export function Stage({ state }: { state: AppState }) {
         <div className="terminal-host" ref={host} />
         {shown.length > 0 && (
           <div
-            className={sideBySide ? 'tiles is-grid' : 'tiles'}
-            style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+            // While something is being chosen to start, the choice has the stage to itself. The tiles
+            // stay where they are underneath: taken away, every terminal would be told of a new size.
+            className={['tiles', sideBySide && 'is-grid', !session && 'is-covered'].filter(Boolean).join(' ')}
+            style={{ gridTemplateColumns: `repeat(${columns}, minmax(${sideBySide ? '200px' : '0'}, 1fr))` }}
           >
             {shown.map((shownSession, index) => (
               <Tile

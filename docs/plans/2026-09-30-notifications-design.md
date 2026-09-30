@@ -58,6 +58,13 @@ Until the user has answered, a notice is neither shown nor refused, and
 Electron says nothing of it. The marks in the window and the count do not
 depend on it.
 
+## What a notice shows
+
+The title of a notice is the name of the session, which the program running
+in it can set. It goes to the notification centre of the system, with its
+history and what it shows on a locked screen. It goes nowhere else: not into
+the bug log, and not onto disk.
+
 ## What this does not do
 
 - It does not reach a phone, or a computer other than the one Telegraph runs

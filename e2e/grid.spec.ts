@@ -150,6 +150,81 @@ test('ends a session from its tile', async () => {
   await expect(tiles().nth(0).locator('.xterm-rows')).toContainText('second 4')
 })
 
+test('keeps the keys where they were when another tile is ended', async () => {
+  await twoSessions()
+  await another()
+  await type('echo "third $((3 + 3))"')
+  await sideBySide().click()
+  await expect(tiles()).toHaveCount(3)
+  await expect(tiles().nth(2)).toHaveClass(/is-active/)
+
+  await tiles().nth(0).getByRole('button', { name: /^End / }).click()
+  await expect(tiles()).toHaveCount(2)
+  await expect(tiles().nth(1)).toHaveClass(/is-active/)
+  await expect(tiles().nth(1).locator('.xterm-rows')).toContainText('third 6')
+  await expect(tiles().nth(1).locator('.xterm-helper-textarea')).toBeFocused()
+})
+
+test('keeps the keys in a tile whose head is pressed', async () => {
+  await twoSessions()
+  await sideBySide().click()
+  await tiles().nth(0).locator('.tile-title').click()
+
+  await expect(tiles().nth(0)).toHaveClass(/is-active/)
+  await expect(tiles().nth(0).locator('.xterm-helper-textarea')).toBeFocused()
+  await tiles().nth(0).locator('.tile-title').click()
+  await expect(tiles().nth(0).locator('.xterm-helper-textarea')).toBeFocused()
+})
+
+test('takes the tile that has the keys for the one in front', async () => {
+  await twoSessions()
+  await sideBySide().click()
+  await expect(tiles().nth(1)).toHaveClass(/is-active/)
+
+  // The keys can get to a tile without it being pressed, as when a file is dropped on it.
+  await tiles().nth(0).locator('.xterm-helper-textarea').focus()
+  await expect(tiles().nth(0)).toHaveClass(/is-active/)
+  await expect(page.locator('.session').first()).toHaveClass(/is-active/)
+})
+
+test('leaves the terminals as they are while something is chosen to start', async () => {
+  await twoSessions()
+  await sideBySide().click()
+  await tiles().nth(0).locator('.tile-body').click()
+  await page.keyboard.type('echo "before: $(stty size)"')
+  await page.keyboard.press('Enter')
+  const first = tiles().nth(0).locator('.xterm-rows')
+  await expect(first).toContainText(/before: \d+ \d+/)
+  const before = /before: (\d+ \d+)/.exec(await first.innerText())![1]
+
+  await page.getByRole('button', { name: 'Start a session in signal-box' }).click()
+  await page.getByRole('menuitem', { name: 'Choose a model or a chat…' }).click()
+  await expect(page.getByRole('combobox', { name: 'Agent' })).toBeVisible()
+  await expect(tiles().first()).toBeHidden()
+  // Told of a new size, the shell would say so when asked.
+  await page.waitForTimeout(400)
+  await page.locator('.session').first().locator('.session-main').click()
+  await page.keyboard.type('echo "after: $(stty size)"')
+  await page.keyboard.press('Enter')
+  await expect(first).toContainText(`after: ${before}`)
+})
+
+test('keeps the head of a tile inside the tile when there is little room', async () => {
+  await twoSessions()
+  for (let more = 0; more < 3; more++) await another()
+  await sideBySide().click()
+  await page.setViewportSize({ width: 760, height: 440 })
+  await expect(tiles()).toHaveCount(5)
+
+  for (let index = 0; index < 5; index++) {
+    const tile = (await tiles().nth(index).boundingBox())!
+    const end = (await tiles().nth(index).getByRole('button', { name: /^End / }).boundingBox())!
+    expect(end.x + end.width, `End of tile ${index}`).toBeLessThanOrEqual(tile.x + tile.width + 0.5)
+    expect(tile.height, `height of tile ${index}`).toBeGreaterThanOrEqual(140)
+    expect(tile.width, `width of tile ${index}`).toBeGreaterThanOrEqual(200)
+  }
+})
+
 test('stays the way it was left', async () => {
   await sideBySide().click()
   await expect(sideBySide()).toHaveAttribute('aria-pressed', 'true')

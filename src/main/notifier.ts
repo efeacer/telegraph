@@ -61,6 +61,12 @@ export class Notifier {
     }
   }
 
+  /** Takes back everything: the window has started over, and the sessions it told of are no more. */
+  clear(): void {
+    for (const sessionId of [...this.shown.keys()]) this.withdraw(sessionId)
+    this.badge(0)
+  }
+
   badge(count: unknown): void {
     if (typeof count !== 'number' || !Number.isInteger(count) || count < 0 || count > MOST_COUNTED) {
       return

@@ -154,3 +154,15 @@ test('counts the sessions that wait, and forgets the ones that are ended', async
   await expect(page.locator('.project-badge')).toHaveText('1')
   await expect.poll(countOnIcon).toBe(1)
 })
+
+test('forgets what it told of when the window starts over', async () => {
+  await start(page, 'Shell')
+  await type(`sleep 1; ${WORK}`)
+  await lookAway()
+  await expect.poll(countOnIcon, { timeout: 15_000 }).toBe(1)
+
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.reload())
+  await expect(page.getByRole('combobox', { name: 'Agent' })).toBeVisible()
+  await expect.poll(countOnIcon).toBe(0)
+  expect((await notices()).every((notice) => notice.closed)).toBe(true)
+})

@@ -421,8 +421,12 @@ function createWindow(): void {
   created.webContents.on('did-start-navigation', (details) => {
     if (!details.isMainFrame || details.isSameDocument) return
     sessions.killAll()
+    notifier.clear()
     pageReports = false
   })
+
+  // The page that is going can still tell of its sessions ending, after it was cleared up behind.
+  created.webContents.on('did-finish-load', () => notifier.clear())
 
   created.webContents.setWindowOpenHandler(({ url }) => {
     openInBrowser(url)

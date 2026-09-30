@@ -33,13 +33,21 @@ export function Tile({ session, project, active, framed, span }: TileProps) {
       style={{ gridColumn: `span ${span}` }}
       data-status={session.status}
       aria-label={framed ? `${label} in ${project}` : undefined}
+      aria-current={framed && active ? 'true' : undefined}
       // Before the terminal takes the press for itself, so that the keys go where the user pointed.
-      onMouseDownCapture={() => {
-        if (!active) activateSession(session.id)
+      // Not for the button that ends the session: ending one is not going to it.
+      onMouseDownCapture={(event) => {
+        if (!active && !(event.target as Element).closest('.tile-end')) activateSession(session.id)
       }}
     >
       {framed && (
-        <header className="tile-head">
+        <header
+          className="tile-head"
+          // A press on what cannot take the keys would take them from the terminal.
+          onMouseDown={(event) => {
+            if (!(event.target as Element).closest('.tile-end')) event.preventDefault()
+          }}
+        >
           <Signal status={session.status} />
           <span className="tile-title">{label}</span>
           <span className="tile-project">{project}</span>
@@ -49,7 +57,6 @@ export function Tile({ session, project, active, framed, span }: TileProps) {
             type="button"
             className="icon-button tile-end"
             aria-label={`End ${label}`}
-            onMouseDownCapture={(event) => event.stopPropagation()}
             onClick={() => void endSession(session.id)}
           >
             <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
@@ -58,7 +65,14 @@ export function Tile({ session, project, active, framed, span }: TileProps) {
           </button>
         </header>
       )}
-      <div className="tile-body" ref={body} />
+      <div
+        className="tile-body"
+        ref={body}
+        // The keys can get here without a press, as when a file is dropped. The tile they are in is the one in front.
+        onFocusCapture={() => {
+          if (!active) activateSession(session.id)
+        }}
+      />
     </section>
   )
 }
