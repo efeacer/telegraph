@@ -101,6 +101,16 @@ export interface Usage {
   reporting: boolean
 }
 
+/** What Telegraph knows of the meetings of the user, and how it came to know it. */
+export interface AgendaState {
+  /** unknown: not read yet. reading: being read now. unavailable: the calendar cannot be read, for the reason given. */
+  status: 'unknown' | 'reading' | 'read' | 'unavailable' | 'failed'
+  meetings: import('./agenda').Meeting[]
+  /** When the meetings were last read. */
+  readAt: string | null
+  reason: string | null
+}
+
 /** A way to start a session. A null command starts a plain shell. */
 export interface Launcher {
   id: string
