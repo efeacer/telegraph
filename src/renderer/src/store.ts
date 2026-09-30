@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { SessionStatus } from '@shared/status'
-import type { Catalogue, Choice, GitStatus, Launcher, Model, Project } from '@shared/types'
+import type { Catalogue, Choice, GitStatus, Launcher, Model, Project, Usage } from '@shared/types'
 
 export interface SessionView {
   id: string
@@ -22,6 +22,8 @@ export interface AppState {
   /** What was last chosen in each project. */
   choices: Record<string, Choice>
   git: Record<string, GitStatus | null>
+  /** What the agents have used. Null until it was read. */
+  usage: Usage | null
   sessions: SessionView[]
   activeSessionId: string | null
   selectedProjectId: string | null
@@ -36,6 +38,7 @@ let state: AppState = {
   catalogue: {},
   choices: {},
   git: {},
+  usage: null,
   sessions: [],
   activeSessionId: null,
   selectedProjectId: null,

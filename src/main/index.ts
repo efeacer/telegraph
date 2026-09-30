@@ -76,20 +76,14 @@ let pageReports = false
 const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'), '.claude')
 const meters = new Meters({ directory: join(app.getPath('userData'), 'usage') })
 const ledger = new TokenLedger({ configDir: claudeConfigDir })
-// Read in the background: a week of records takes a moment the first time.
-let days: Awaited<ReturnType<TokenLedger['read']>> = []
-let readingDays: Promise<void> | null = null
+let readingDays: ReturnType<TokenLedger['read']> | null = null
 
-function readDays(): void {
-  readingDays ??= ledger
-    .read()
-    .then((read) => {
-      days = read
-    })
-    .catch(() => {})
-    .finally(() => {
-      readingDays = null
-    })
+/** One reading at a time: the ledger reads on from where it was, and two readers would count twice. */
+function readDays(): ReturnType<TokenLedger['read']> {
+  readingDays ??= ledger.read().finally(() => {
+    readingDays = null
+  })
+  return readingDays
 }
 
 const sessions = new PtyManager(app.getVersion(), {
@@ -159,11 +153,11 @@ function registerIpc(
     return listChats({ configDir: claudeConfigDir, projectPath: project.path })
   })
 
-  handle(IPC.readUsage, () => {
-    // What was read last, while the records are read again for the next time.
-    readDays()
-    return { ...meters.read(), days, reporting: !hasOwnStatusLine(claudeConfigDir) }
-  })
+  handle(IPC.readUsage, async () => ({
+    ...meters.read(),
+    days: await readDays(),
+    reporting: !hasOwnStatusLine(claudeConfigDir)
+  }))
 
   handle(IPC.addProject, async () => {
     if (!window) return null
@@ -375,7 +369,9 @@ if (!app.requestSingleInstanceLock()) {
   bugLog.start()
   attachments.clearOld()
   meters.clearOld()
-  readDays()
+  meters.watch(() => send(IPC.usageChanged))
+  // A week of records takes a moment to read the first time, so that starts before the window asks.
+  void readDays().catch(() => {})
 
   void app.whenReady().then(() => {
     const store = new StateStore(join(app.getPath('userData'), 'state.json'), (error, backupPath) =>

@@ -7,6 +7,7 @@ export const IPC = {
   saveChoice: 'choices:save',
   listChats: 'chats:list',
   readUsage: 'usage:read',
+  usageChanged: 'usage:changed',
   saveAttachment: 'attachments:save',
   gitStatus: 'git:status',
   createSession: 'session:create',

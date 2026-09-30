@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, watch } from 'node:fs'
 import { join } from 'node:path'
 import type { Limit, Limits, SessionMeter } from '@shared/types'
 
@@ -6,6 +6,8 @@ export { STATUS_LINE_SETTINGS, USAGE_FILE_VARIABLE } from '@shared/usage'
 
 const KEPT_FOR_MS = 7 * 24 * 60 * 60 * 1000
 const ENDING = '.json'
+// Sessions report with every answer. Several reports in a row are told of once.
+const SETTLE_MS = 150
 // A session is named by the window, and its name becomes the name of a file.
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
 
@@ -55,6 +57,21 @@ export class Meters {
       limits ??= readLimits(status, at, this.now())
     }
     return { limits, sessions }
+  }
+
+  /** Calls back when a session has reported. Never throws: without it, reports are read when asked for. */
+  watch(onReport: () => void): void {
+    try {
+      mkdirSync(this.options.directory, { recursive: true, mode: 0o700 })
+      let settling: NodeJS.Timeout | null = null
+      watch(this.options.directory, (_event, name) => {
+        if (!name?.endsWith(ENDING)) return
+        if (settling) clearTimeout(settling)
+        settling = setTimeout(onReport, SETTLE_MS)
+      }).on('error', () => {})
+    } catch {
+      // The folder cannot be watched.
+    }
   }
 
   /** Removes the reports of more than a week ago, except the last, which still knows the limits. */

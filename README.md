@@ -43,6 +43,16 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## What was used
+
+The mark in the top right corner shows how much of the 5-hour limit of your
+plan is used. It opens into a panel with the limits, the tokens of today and
+of the last week by model, and the cost and context of the session in front.
+
+The limits come from Claude Code itself, which reports them to sessions
+started in Telegraph. The tokens are added up from the records Claude Code
+keeps on this computer. Nothing is sent anywhere.
+
 ## Going on with a chat
 
 The chats Claude has had in a project are offered where a session is started,

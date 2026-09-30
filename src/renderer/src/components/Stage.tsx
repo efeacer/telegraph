@@ -4,6 +4,7 @@ import { addProject, attachTerminalHost, dismissError } from '../controller'
 import { describeGit, shortenPath } from '../format'
 import { sessionLabel, type AppState } from '../store'
 import { Picker } from './Picker'
+import { Usage } from './Usage'
 
 export function Stage({ state }: { state: AppState }) {
   const host = useRef<HTMLDivElement>(null)
@@ -38,6 +39,10 @@ export function Stage({ state }: { state: AppState }) {
             </div>
           </>
         )}
+        <Usage
+          usage={state.usage}
+          session={(session && state.usage?.sessions[session.id]) ?? null}
+        />
       </header>
 
       {state.error && (

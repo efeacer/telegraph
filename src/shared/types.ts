@@ -182,6 +182,8 @@ export interface TelegraphApi {
   /** The chats a launcher has had in a project, the latest first. None if it keeps none. */
   listChats(projectId: string, launcherId: string): Promise<Chat[]>
   readUsage(): Promise<Usage>
+  /** Called when a session has reported, so that what was used can be read again. */
+  onUsageChanged(listener: () => void): () => void
   gitStatus(projectPath: string): Promise<GitStatus | null>
   createSession(request: CreateSessionRequest): Promise<CreateSessionResult>
   /** Resolves to false when the user chose to keep the session running. */

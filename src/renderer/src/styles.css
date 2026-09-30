@@ -851,3 +851,276 @@ button:focus-visible {
   color: var(--slate);
   white-space: nowrap;
 }
+
+/*
+ * What was used
+ *
+ * A mark in the corner of the window opens into a panel. The limits of the
+ * plan are dials, the way an operator reads a line: glass while there is
+ * plenty, brass when it runs low, red when it is nearly gone.
+ */
+
+:root {
+  /* The unfilled part of a dial, a dimmer step of what fills it. */
+  --brass-dim: #5b4a26;
+  --stop-dim: #5e2f2a;
+  /* The days before today, which today stands out from. */
+  --column: #64788a;
+}
+
+.stage {
+  position: relative;
+}
+
+/* The title keeps to the left, and all else in the header to the right. */
+.stage-title {
+  margin-right: auto;
+}
+
+.stage-header > .usage-chip:first-child {
+  margin-left: auto;
+}
+
+.usage-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: var(--text-small);
+  color: var(--slate);
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.usage-chip:hover,
+.usage-chip[aria-expanded='true'] {
+  color: var(--paper);
+  background: var(--night-pressed);
+}
+
+.usage-ring {
+  flex: none;
+  display: block;
+}
+
+.usage-ring circle {
+  fill: none;
+}
+
+.usage-ring-track {
+  stroke: var(--glass-dim);
+}
+
+.usage-ring-fill {
+  stroke: var(--glass);
+  stroke-linecap: round;
+}
+
+.usage-ring[data-level='raised'] .usage-ring-track {
+  stroke: var(--brass-dim);
+}
+
+.usage-ring[data-level='raised'] .usage-ring-fill {
+  stroke: var(--brass);
+}
+
+.usage-ring[data-level='high'] .usage-ring-track {
+  stroke: var(--stop-dim);
+}
+
+.usage-ring[data-level='high'] .usage-ring-fill {
+  stroke: var(--stop);
+}
+
+.usage-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(var(--titlebar-height) + 8px);
+  right: 12px;
+  width: 296px;
+  max-height: calc(100% - var(--titlebar-height) - 20px);
+  overflow-y: auto;
+  padding: 18px 18px 16px;
+  border: 1px solid var(--wire);
+  border-radius: 10px;
+  background: var(--night-raised);
+  box-shadow: 0 16px 36px rgba(6, 11, 16, 0.55);
+  scrollbar-width: thin;
+  scrollbar-color: var(--wire) transparent;
+  user-select: text;
+}
+
+.usage-panel h2 {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  font-stretch: 100%;
+}
+
+.usage-panel p {
+  margin: 0;
+}
+
+.usage-note,
+.usage-aside {
+  font-size: var(--text-small);
+  line-height: 1.45;
+  color: var(--slate);
+}
+
+.usage-limits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.usage-limit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.usage-dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-bottom: 9px;
+}
+
+.usage-dial-figure {
+  position: absolute;
+  font-size: 19px;
+  font-weight: 650;
+  font-stretch: 100%;
+  letter-spacing: -0.01em;
+}
+
+.usage-dial-figure small {
+  margin-left: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--slate);
+}
+
+.usage-limit-name {
+  font-weight: 600;
+}
+
+.usage-warning {
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.usage-block {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--wire-faint);
+}
+
+.usage-note + .usage-block {
+  margin-top: 14px;
+}
+
+.usage-figure {
+  margin: 2px 0 3px;
+  font-size: 30px;
+  font-weight: 650;
+  font-stretch: 100%;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+.usage-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  height: 92px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usage-day {
+  display: grid;
+  grid-template-rows: 15px 1fr 17px;
+  justify-items: center;
+  min-width: 0;
+  border-radius: 4px;
+  font-size: 10.5px;
+  color: var(--slate);
+}
+
+.usage-day:focus-visible {
+  outline: 2px solid var(--glass);
+  outline-offset: 0;
+}
+
+/* The value of a day shows when it is pointed at. That of today always does. */
+.usage-day-value {
+  visibility: hidden;
+  color: var(--paper);
+  white-space: nowrap;
+}
+
+.usage-day.is-today .usage-day-value,
+.usage-day:hover .usage-day-value,
+.usage-day:focus-visible .usage-day-value {
+  visibility: visible;
+}
+
+.usage-week:hover .usage-day.is-today:not(:hover) .usage-day-value {
+  visibility: hidden;
+}
+
+.usage-day-column {
+  align-self: end;
+  width: min(20px, 72%);
+  border-radius: 4px 4px 0 0;
+  background: var(--column);
+}
+
+.usage-day.is-today .usage-day-column {
+  background: var(--glass);
+}
+
+.usage-day-name {
+  align-self: end;
+  width: 100%;
+  border-top: 1px solid var(--wire-faint);
+  padding-top: 3px;
+  text-align: center;
+}
+
+.usage-day.is-today .usage-day-name {
+  color: var(--paper);
+}
+
+.usage-models {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usage-models li,
+.usage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.usage-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--slate);
+}
+
+.usage-row {
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 7px 0 4px;
+}

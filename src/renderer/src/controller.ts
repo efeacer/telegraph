@@ -12,6 +12,8 @@ const TICK_INTERVAL_MS = 500
 // offers all of them. A shell that reads a lot of settings can take longer.
 const DETECTION_GRACE_MS = 400
 const GIT_REFRESH_INTERVAL_MS = 10_000
+// Sessions started here say when they have used something. The others are only found out by looking.
+const USAGE_REFRESH_INTERVAL_MS = 30_000
 const SESSION_ENDED_NOTE = '\r\n\x1b[2mSession ended.\x1b[0m\r\n'
 
 const api = window.telegraph
@@ -33,6 +35,7 @@ export async function initialize(): Promise<void> {
   })
   api.onMenuCommand(handleMenuCommand)
   api.onProblem((message) => setState((state) => ({ ...state, error: message })))
+  api.onUsageChanged(() => void refreshUsage())
 
   const persisted = await api.loadState()
   // Null when it cannot be told, in which case every launcher is offered.
@@ -71,7 +74,9 @@ export async function initialize(): Promise<void> {
 
   setInterval(tick, TICK_INTERVAL_MS)
   setInterval(() => void refreshGit(), GIT_REFRESH_INTERVAL_MS)
+  setInterval(() => void refreshUsage(), USAGE_REFRESH_INTERVAL_MS)
   void refreshGit()
+  void refreshUsage()
 }
 
 export async function addProject(): Promise<string | null> {
@@ -187,7 +192,9 @@ export async function startSession(
     command: composeCommand(launcher, {
       model: modelId,
       modeId: start.modeId ?? null,
-      chatId: start.chatId ?? null
+      chatId: start.chatId ?? null,
+      // Not asked of a user with a status line of their own, which the asking would take the place of.
+      report: current.usage?.reporting ?? false
     }),
     cols: size.cols,
     rows: size.rows
@@ -348,6 +355,15 @@ function tick(): void {
   const at = performance.now()
   for (const sessionId of statuses.keys()) {
     track(sessionId, { type: 'tick', at, focused: isWatched(sessionId) })
+  }
+}
+
+export async function refreshUsage(): Promise<void> {
+  try {
+    const usage = await api.readUsage()
+    setState((state) => ({ ...state, usage }))
+  } catch {
+    // What was read last stays, and is read again soon.
   }
 }
 
