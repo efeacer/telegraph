@@ -15,6 +15,27 @@ export interface SessionView {
   unread: boolean
 }
 
+export type Layout = 'single' | 'grid'
+
+const LAYOUT_KEY = 'telegraph.layout'
+
+/** Kept by the window, since it is about nothing but the window. */
+function lastLayout(): Layout {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === 'grid' ? 'grid' : 'single'
+  } catch {
+    return 'single'
+  }
+}
+
+export function keepLayout(layout: Layout): void {
+  try {
+    localStorage.setItem(LAYOUT_KEY, layout)
+  } catch {
+    // One session at a time again at the next start, which is no loss.
+  }
+}
+
 export interface AppState {
   loaded: boolean
   projects: Project[]
@@ -29,6 +50,8 @@ export interface AppState {
   sessions: SessionView[]
   activeSessionId: string | null
   selectedProjectId: string | null
+  /** One session at a time, or all of them side by side. */
+  layout: Layout
   error: string | null
   reportingBug: boolean
 }
@@ -44,6 +67,7 @@ let state: AppState = {
   sessions: [],
   activeSessionId: null,
   selectedProjectId: null,
+  layout: lastLayout(),
   error: null,
   reportingBug: false
 }

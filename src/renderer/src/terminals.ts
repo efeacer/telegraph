@@ -34,8 +34,10 @@ export interface TerminalOptions {
 }
 
 /**
- * Owns the terminals outside React. Each one keeps its own element and stays
- * mounted while hidden, so switching sessions never loses scrollback.
+ * Owns the terminals outside React. Each one keeps its own element for as
+ * long as its session lasts, so nothing it has shown is lost when it is out
+ * of sight. A terminal that is shown is placed in a tile of the stage. One
+ * that is not waits in the host, which is as large as the stage and hidden.
  */
 export class TerminalManager {
   private readonly views = new Map<string, TerminalView>()
@@ -50,6 +52,18 @@ export class TerminalManager {
     this.resizeObserver?.disconnect()
     this.resizeObserver = new ResizeObserver(() => this.scheduleFit())
     this.resizeObserver.observe(host)
+    for (const view of this.views.values()) this.resizeObserver.observe(view.element)
+  }
+
+  /** Moves a terminal into a tile, or back to the host when it is given none. */
+  place(sessionId: string, container: HTMLElement | null): void {
+    const view = this.views.get(sessionId)
+    const home = container ?? this.host
+    if (!view || !home || view.element.parentElement === home) return
+    home.append(view.element)
+    this.scheduleFit()
+    // Moving an element takes the keys from it.
+    if (view.element.classList.contains('is-active')) view.terminal.focus()
   }
 
   create(sessionId: string, handlers: TerminalHandlers): { cols: number; rows: number } {
@@ -92,6 +106,8 @@ export class TerminalManager {
     terminal.onBell(handlers.onBell)
     terminal.onTitleChange(handlers.onTitle)
 
+    // Each by its own size: in a tile a terminal is smaller than the stage.
+    this.resizeObserver?.observe(element)
     this.views.set(sessionId, { terminal, fit, element })
     return { cols: terminal.cols, rows: terminal.rows }
   }
@@ -123,6 +139,7 @@ export class TerminalManager {
   dispose(sessionId: string): void {
     const view = this.views.get(sessionId)
     if (!view) return
+    this.resizeObserver?.unobserve(view.element)
     view.terminal.dispose()
     view.element.remove()
     this.views.delete(sessionId)

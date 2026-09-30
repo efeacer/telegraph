@@ -5,7 +5,14 @@ import { escapePath } from '@shared/paths'
 import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
 import type { Chat, Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
-import { getState, orderedSessions, sessionLabel, setState, type SessionView } from './store'
+import {
+  getState,
+  keepLayout,
+  orderedSessions,
+  sessionLabel,
+  setState,
+  type SessionView
+} from './store'
 import { TerminalManager } from './terminals'
 
 const TICK_INTERVAL_MS = 500
@@ -23,6 +30,23 @@ const statuses = new Map<string, StatusState>()
 
 export function attachTerminalHost(host: HTMLElement): void {
   terminals.attach(host)
+}
+
+/** Puts the terminal of a session into its tile, or out of sight when it has none. */
+export function placeTerminal(sessionId: string, container: HTMLElement | null): void {
+  terminals.place(sessionId, container)
+}
+
+/** Changes between one session at a time and all of them side by side. */
+export function toggleLayout(): void {
+  const layout = getState().layout === 'grid' ? 'single' : 'grid'
+  setState((state) => ({ ...state, layout }))
+  keepLayout(layout)
+  // The keys go back to the session once it is in its new place, from the button that was pressed.
+  requestAnimationFrame(() => {
+    const { activeSessionId } = getState()
+    if (activeSessionId) terminals.focus(activeSessionId)
+  })
 }
 
 export async function initialize(): Promise<void> {
@@ -370,6 +394,8 @@ function tell(sessionId: string, kind: NoticeKind): void {
   if (!session || !project) return
   updateSession(sessionId, { unread: true })
   countUnread()
+  // Side by side, the session is in plain view of a user who is at the window: the mark says enough.
+  if (state.layout === 'grid' && state.activeSessionId !== null && document.hasFocus()) return
   api.notify({
     sessionId,
     ...describeNotice(kind, { session: sessionLabel(session), project: project.name })
@@ -454,6 +480,9 @@ function handleMenuCommand(command: MenuCommand): void {
       break
     case 'report-bug':
       openBugReport()
+      break
+    case 'toggle-layout':
+      toggleLayout()
       break
   }
 }

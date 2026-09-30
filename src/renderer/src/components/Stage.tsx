@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef } from 'react'
 import { STATUS_LABELS } from '@shared/status'
-import { addProject, attachTerminalHost, dismissError } from '../controller'
+import { arrange } from '../arrange'
+import { addProject, attachTerminalHost, dismissError, toggleLayout } from '../controller'
 import { describeGit, shortenPath } from '../format'
-import { sessionLabel, type AppState } from '../store'
+import { orderedSessions, sessionLabel, type AppState } from '../store'
 import { Picker } from './Picker'
+import { Tile } from './Tile'
 import { Usage } from './Usage'
 
 export function Stage({ state }: { state: AppState }) {
@@ -17,6 +19,10 @@ export function Stage({ state }: { state: AppState }) {
   const session = state.sessions.find((candidate) => candidate.id === state.activeSessionId)
   const git = project ? state.git[project.id] : null
   const hasSessions = state.sessions.some((candidate) => candidate.projectId === project?.id)
+  const sideBySide = state.layout === 'grid'
+  // While something is being chosen to start, the choice has the stage to itself.
+  const shown = !session ? [] : sideBySide ? orderedSessions(state) : [session]
+  const { columns, spans } = arrange(shown.length)
 
   return (
     <main className="stage">
@@ -39,6 +45,24 @@ export function Stage({ state }: { state: AppState }) {
             </div>
           </>
         )}
+        <button
+          type="button"
+          className="layout-toggle"
+          aria-label="Show sessions side by side"
+          aria-pressed={sideBySide}
+          title={sideBySide ? 'Show one session at a time' : 'Show sessions side by side'}
+          onClick={toggleLayout}
+        >
+          <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+            <path
+              d="M1.75 1.75h4.5v4.5h-4.5zM7.75 1.75h4.5v4.5h-4.5zM1.75 7.75h4.5v4.5h-4.5zM7.75 7.75h4.5v4.5h-4.5z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.25"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
         <Usage
           usage={state.usage}
           session={(session && state.usage?.sessions[session.id]) ?? null}
@@ -56,6 +80,25 @@ export function Stage({ state }: { state: AppState }) {
 
       <div className="stage-body">
         <div className="terminal-host" ref={host} />
+        {shown.length > 0 && (
+          <div
+            className={sideBySide ? 'tiles is-grid' : 'tiles'}
+            style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+          >
+            {shown.map((shownSession, index) => (
+              <Tile
+                key={shownSession.id}
+                session={shownSession}
+                project={
+                  state.projects.find((candidate) => candidate.id === shownSession.projectId)?.name ?? ''
+                }
+                active={shownSession.id === state.activeSessionId}
+                framed={sideBySide}
+                span={spans[index] ?? 1}
+              />
+            ))}
+          </div>
+        )}
         {state.loaded && !session && (
           <div className="empty">
             {project ? (

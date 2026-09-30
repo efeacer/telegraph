@@ -75,6 +75,12 @@ export function buildMenu(options: MenuOptions): Menu {
         { type: 'separator' },
         ...selectItems,
         { type: 'separator' },
+        {
+          id: 'toggle-layout',
+          label: 'Sessions Side by Side',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => send({ type: 'toggle-layout' })
+        },
         { role: 'togglefullscreen' },
         ...(includeDeveloperTools
           ? ([

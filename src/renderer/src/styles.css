@@ -510,20 +510,147 @@ button:focus-visible {
   min-height: 0;
 }
 
+/* Where terminals wait that are not shown. As large as the stage, so that they stay fitted to it. */
 .terminal-host {
   position: absolute;
   inset: 12px 6px 10px 18px;
+  visibility: hidden;
 }
 
 .terminal-view {
   position: absolute;
   inset: 0;
-  /* Hidden terminals keep their size, so they stay fitted to the window. */
-  visibility: hidden;
 }
 
-.terminal-view.is-active {
-  visibility: visible;
+/*
+ * The stage
+ *
+ * One session fills it. Side by side, every session has a tile with a head
+ * that says which it is, and the one the keys go to is outlined in glass.
+ */
+
+.tiles {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.tiles.is-grid {
+  gap: 1px;
+  background: var(--wire-faint);
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--well);
+}
+
+.tile-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 12px 6px 10px 18px;
+}
+
+.tile.is-framed .tile-body {
+  margin: 8px 4px 6px 12px;
+}
+
+/* Drawn over the tile, so that the terminals of all tiles keep the same size. */
+.tile.is-framed.is-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--glass);
+  pointer-events: none;
+}
+
+.tile-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 4px 0 8px;
+  border-bottom: 1px solid var(--wire-faint);
+  font-size: var(--text-small);
+  color: var(--slate);
+  background: var(--night);
+  white-space: nowrap;
+}
+
+.tile.is-active .tile-head {
+  background: var(--night-raised);
+}
+
+.tile-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-body);
+  color: var(--slate);
+}
+
+.tile.is-active .tile-title,
+.tile[data-status='attention'] .tile-title {
+  color: var(--paper);
+}
+
+.tile-project {
+  flex: none;
+}
+
+.tile-status {
+  flex: none;
+  margin-left: auto;
+}
+
+.tile[data-status='working'] .tile-status {
+  color: var(--glass);
+}
+
+.tile[data-status='attention'] .tile-status {
+  color: var(--brass);
+}
+
+.tile-badge {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--stop);
+}
+
+.tile-end {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.layout-toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--slate);
+  -webkit-app-region: no-drag;
+}
+
+.layout-toggle:hover {
+  color: var(--paper);
+  background: var(--night-pressed);
+}
+
+.layout-toggle[aria-pressed='true'] {
+  color: var(--glass);
+  background: var(--night-pressed);
 }
 
 .terminal-view .xterm {
@@ -877,8 +1004,12 @@ button:focus-visible {
   margin-right: auto;
 }
 
-.stage-header > .usage-chip:first-child {
+.stage-header > .layout-toggle:first-child {
   margin-left: auto;
+}
+
+.stage-header > .layout-toggle {
+  margin-right: -16px;
 }
 
 .usage-chip {

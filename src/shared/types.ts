@@ -168,6 +168,7 @@ export type MenuCommand =
   | { type: 'clear' }
   | { type: 'add-project' }
   | { type: 'report-bug' }
+  | { type: 'toggle-layout' }
 
 export interface TelegraphApi {
   /** True when the app runs under the end-to-end tests. */

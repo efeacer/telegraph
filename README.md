@@ -43,6 +43,12 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Sessions side by side
+
+The button in the top right corner, or View > Sessions Side by Side (⇧⌘G),
+lays all open sessions out next to each other, each in a tile. Press it again
+to go back to one session at a time.
+
 ## Notifications
 
 When a session you are not looking at stops working, rings its bell or ends,
