@@ -1,11 +1,11 @@
-import { pauseSession, resumeSession, stopSession } from '../controller'
+import { pauseSession, resumeSession } from '../controller'
 import { sessionLabel, type SessionView } from '../store'
 import { Icon } from './Icon'
 
 /**
- * Pause and play, and stop, for a session. In the header they say what they
- * are; in a row or a tile, where there is little room, they are icons, and
- * say it when pointed at.
+ * Pause and play for a session. In the header it says what it is; in a row or
+ * a tile, where there is little room, it is an icon, and says it when pointed
+ * at. The × beside it ends the session; Stop is in the menu, as ⌘.
  */
 export function SessionControls({ session, labelled = false }: { session: SessionView; labelled?: boolean }) {
   if (session.status === 'exited') return null
@@ -36,16 +36,6 @@ export function SessionControls({ session, labelled = false }: { session: Sessio
           {labelled && <span>Pause</span>}
         </button>
       )}
-      <button
-        type="button"
-        className="control-button"
-        aria-label={name('Stop')}
-        title={`Stop what ${label} is doing, as Esc does. The session stays open.`}
-        onClick={() => void stopSession(session.id)}
-      >
-        <Icon name="stop" size={14} />
-        {labelled && <span>Stop</span>}
-      </button>
     </span>
   )
 }

@@ -16,9 +16,10 @@ when it is in front:
 | Stop | Stops what it is doing, as Esc does in an agent and Ctrl-C in a shell. The session stays open |
 | End (×) | Ends the session |
 
-In the header they are buttons with words; in a row or a tile, icons that say
-what they do when pointed at. In the menu: Session > Pause or Resume (⇧⌘P)
-and Stop What It Is Doing (⌘.).
+In the header Pause is a button with words; in a row or a tile, an icon that
+says what it does when pointed at. Stop has no button, since the × beside a
+session already ends it: it is in the menu, as Session > Stop What It Is
+Doing (⌘.), with Pause or Resume (⇧⌘P).
 
 Pausing sends SIGSTOP to the program and every process it started, and
 resuming SIGCONT. An agent that is frozen for long can lose its connection to

@@ -46,9 +46,9 @@ Only `id`, `name` and `command` are needed. See
 ## Pause, stop and end
 
 Every session has a pause button, which freezes it where it is until you
-resume it, and a stop button, which stops what it is doing as Esc does and
-keeps the session open. The × ends it. They are in its row, its tile, and the
-header, and in the Session menu (⇧⌘P and ⌘.).
+resume it, and the ×, which ends it. They are in its row, its tile, and the
+header. The Session menu also has Stop What It Is Doing (⌘.), which stops what
+the agent is doing, as Esc does, and keeps the session open.
 
 ## Connecting Google
 

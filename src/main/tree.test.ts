@@ -17,6 +17,14 @@ describe('descendants', () => {
     expect(descendants(100, list).sort()).toEqual([100, 101, 102, 103])
   })
 
+  it('lists each process before those it started', () => {
+    const list = ['100 1', '103 101', '101 100', '102 101', '104 103'].join('\n')
+    const found = descendants(100, list)
+    for (const [parent, child] of [[100, 101], [101, 102], [101, 103], [103, 104]]) {
+      expect(found.indexOf(parent!), `${parent} before ${child}`).toBeLessThan(found.indexOf(child!))
+    }
+  })
+
   it('finds only the process itself when it started nothing', () => {
     expect(descendants(300, '300 1\n301 2')).toEqual([300])
   })

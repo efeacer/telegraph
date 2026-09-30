@@ -31,7 +31,9 @@ async function counting(): Promise<void> {
   await start(page, 'Shell')
   await page.locator('.terminal-view.is-active .xterm-helper-textarea').focus()
   await expect(terminal()).toContainText('$')
-  await page.keyboard.type('i=0; while [ $i -lt 400 ]; do i=$((i+1)); echo "count $i"; sleep 0.1; done')
+  // One program that runs until it is stopped, as an agent does. A loop of the shell's would start a
+  // program for every step, and a Ctrl-C between two of them would reach none.
+  await page.keyboard.type(`perl -e '$| = 1; for (1..400) { print "count $_\\n"; select(undef, undef, undef, 0.1) }'`)
   await page.keyboard.press('Enter')
   await expect(terminal()).toContainText('count 3')
 }
@@ -57,9 +59,14 @@ test('pauses a session where it is, and plays it on from there', async () => {
   await expect.poll(lastCount).toBeGreaterThan(paused + 3)
 })
 
+/** Stop is in the menu, as ⌘.: the × beside a session ends it. */
+function stop(): Promise<void> {
+  return app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('stop-session')?.click())
+}
+
 test('stops what a session is doing, and keeps the session', async () => {
   await counting()
-  await header().getByRole('button', { name: 'Stop' }).click()
+  await stop()
   await page.waitForTimeout(600)
   const stopped = await lastCount()
   await page.waitForTimeout(1200)
@@ -76,7 +83,7 @@ test('stops a paused session too', async () => {
   await counting()
   await header().getByRole('button', { name: 'Pause' }).click()
   await expect(row()).toHaveAttribute('data-paused', 'true')
-  await header().getByRole('button', { name: 'Stop' }).click()
+  await stop()
   await expect(row()).not.toHaveAttribute('data-paused', 'true')
   await page.locator('.terminal-view.is-active .xterm-helper-textarea').focus()
   await page.keyboard.type('echo "after $((40 + 2))"')
@@ -113,7 +120,8 @@ test('has the controls in the row, in the tile, and in the menu', async () => {
 test('explains each control when pointed at', async () => {
   await counting()
   await expect(header().getByRole('button', { name: 'Pause' })).toHaveAttribute('title', /Freeze .* where it is/)
-  await expect(header().getByRole('button', { name: 'Stop' })).toHaveAttribute('title', /Stop what .* is doing/)
+  // Only pause and the ×: a square stop beside the × said the same twice.
+  await expect(page.getByRole('button', { name: /^Stop/ })).toHaveCount(0)
 })
 
 test.describe('the first start', () => {
