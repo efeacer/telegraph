@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs the telegraph command with the Node that Telegraph carries within it.
+ELECTRON_RUN_AS_NODE=1 exec "$TELEGRAPH_NODE" "$TELEGRAPH_CLI" "$@"
