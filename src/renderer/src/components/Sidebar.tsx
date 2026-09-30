@@ -1,4 +1,3 @@
-import { STATUS_LABELS } from '@shared/status'
 import type { GitStatus, Launcher, Project } from '@shared/types'
 import { THEMES, type ThemeName } from '@shared/themes'
 import type { AgendaState } from '@shared/types'
@@ -12,11 +11,12 @@ import {
   startRenaming
 } from '../controller'
 import { describeGit, describeMeetingTime } from '../format'
-import { modelOf, sessionLabel, type AppState, type SessionView } from '../store'
+import { modelOf, sessionLabel, statusLabel, type AppState, type SessionView } from '../store'
 import { Icon } from './Icon'
 import { NameField } from './NameField'
 import { ProjectMenu } from './ProjectMenu'
 import { Select } from './Select'
+import { SessionControls } from './SessionControls'
 import { Signal } from './Signal'
 
 export function Sidebar({ state }: { state: AppState }) {
@@ -150,14 +150,18 @@ interface SessionRowProps {
 function SessionRow({ session, model, active, renaming }: SessionRowProps) {
   const label = sessionLabel(session)
   return (
-    <li className={active ? 'session is-active' : 'session'} data-status={session.status}>
+    <li
+      className={active ? 'session is-active' : 'session'}
+      data-status={session.status}
+      data-paused={session.paused || undefined}
+    >
       <button
         type="button"
         className="session-main"
         aria-current={active ? 'true' : undefined}
         onClick={() => activateSession(session.id)}
       >
-        <Signal status={session.status} />
+        <Signal status={session.status} paused={session.paused} />
         <span className="session-text">
           {renaming ? (
             <NameField sessionId={session.id} name={session.name ?? label} />
@@ -171,12 +175,13 @@ function SessionRow({ session, model, active, renaming }: SessionRowProps) {
             </span>
           )}
           <span className="session-status">
-            {STATUS_LABELS[session.status]}
+            {statusLabel(session)}
             {model && <span className="session-model">{model}</span>}
           </span>
         </span>
         {session.unread && <span className="session-badge" role="img" aria-label="Something new" />}
       </button>
+      <SessionControls session={session} />
       <button
         type="button"
         className="icon-button session-end"

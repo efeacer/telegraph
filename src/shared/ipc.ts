@@ -29,6 +29,8 @@ export const IPC = {
   gitStatus: 'git:status',
   createSession: 'session:create',
   closeSession: 'session:close',
+  pauseSession: 'session:pause',
+  resumeSession: 'session:resume',
   write: 'session:write',
   resize: 'session:resize',
   sessionData: 'session:data',

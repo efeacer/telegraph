@@ -144,6 +144,8 @@ export interface Launcher {
   modelCommand?: string
   /** Typed into a running session, followed by a name, to rename the chat. */
   renameCommand?: string
+  /** Typed to stop what the program is doing: Esc for agents, and Ctrl-C by default. */
+  interruptKey?: string
   /** The providers in the catalogue whose models the program runs. */
   providers?: string[]
   /** Models offered first, and the only ones offered without the catalogue. */
@@ -208,6 +210,8 @@ export type MenuCommand =
   | { type: 'report-bug' }
   | { type: 'toggle-layout' }
   | { type: 'rename-session' }
+  | { type: 'pause-session' }
+  | { type: 'stop-session' }
 
 export interface TelegraphApi {
   /** True when the app runs under the end-to-end tests. */
@@ -255,6 +259,9 @@ export interface TelegraphApi {
   createSession(request: CreateSessionRequest): Promise<CreateSessionResult>
   /** Resolves to false when the user chose to keep the session running. */
   closeSession(sessionId: string): Promise<boolean>
+  /** Freezes a session where it is. Resolves to false where that cannot be done, as on Windows. */
+  pauseSession(sessionId: string): Promise<boolean>
+  resumeSession(sessionId: string): Promise<boolean>
   write(sessionId: string, data: string): void
   resize(sessionId: string, cols: number, rows: number): void
   openExternal(url: string): void

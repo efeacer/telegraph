@@ -4,6 +4,7 @@ import * as pty from 'node-pty'
 import type { CreateSessionRequest } from '@shared/types'
 import { USAGE_FILE_VARIABLE } from '@shared/usage'
 import { buildSessionEnv, buildShellInvocation, shellName } from './shell'
+import { signalTree } from './tree'
 
 // Output is collected for a frame before it crosses to the window, so a
 // chatty process costs one message per frame instead of one per chunk.
@@ -11,6 +12,7 @@ const FLUSH_INTERVAL_MS = 8
 
 interface Session {
   process: pty.IPty
+  paused: boolean
   shell: string
   pending: string
   flushTimer: NodeJS.Timeout | null
@@ -57,6 +59,7 @@ export class PtyManager {
 
     const session: Session = {
       process: child,
+      paused: false,
       shell: invocation.env.SHELL!,
       pending: '',
       flushTimer: null
@@ -84,11 +87,32 @@ export class PtyManager {
   }
 
   kill(sessionId: string): void {
-    this.sessions.get(sessionId)?.process.kill()
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+    // A frozen process cannot end until it is let go on.
+    if (session.paused) this.resume(sessionId)
+    session.process.kill()
   }
 
   killAll(): void {
-    for (const session of this.sessions.values()) session.process.kill()
+    for (const sessionId of [...this.sessions.keys()]) this.kill(sessionId)
+  }
+
+  /** Freezes a session where it is: the program and whatever it runs. False where that cannot be done. */
+  pause(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId)
+    if (!session || process.platform === 'win32') return false
+    signalTree(session.process.pid, 'SIGSTOP')
+    session.paused = true
+    return true
+  }
+
+  resume(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId)
+    if (!session || process.platform === 'win32') return false
+    signalTree(session.process.pid, 'SIGCONT')
+    session.paused = false
+    return true
   }
 
   /** Name of what is running in front of the shell, or null when the shell is at its prompt. */

@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from 'react'
-import { STATUS_LABELS } from '@shared/status'
 import { activateSession, endSession, placeTerminal, startRenaming } from '../controller'
-import { sessionLabel, type SessionView } from '../store'
+import { sessionLabel, statusLabel, type SessionView } from '../store'
 import { NameField } from './NameField'
+import { SessionControls } from './SessionControls'
 import { Signal } from './Signal'
 
 interface TileProps {
@@ -40,7 +40,7 @@ export function Tile({ session, model, project, active, framed, span, renaming }
       // Before the terminal takes the press for itself, so that the keys go where the user pointed.
       // Not for the button that ends the session: ending one is not going to it.
       onMouseDownCapture={(event) => {
-        if (!active && !(event.target as Element).closest('.tile-end')) activateSession(session.id)
+        if (!active && !(event.target as Element).closest('.tile-end, .session-controls')) activateSession(session.id)
       }}
     >
       {framed && (
@@ -48,10 +48,10 @@ export function Tile({ session, model, project, active, framed, span, renaming }
           className="tile-head"
           // A press on what cannot take the keys would take them from the terminal.
           onMouseDown={(event) => {
-            if (!(event.target as Element).closest('.tile-end, .name-field')) event.preventDefault()
+            if (!(event.target as Element).closest('.tile-end, .name-field, .session-controls')) event.preventDefault()
           }}
         >
-          <Signal status={session.status} />
+          <Signal status={session.status} paused={session.paused} />
           {renaming ? (
             <NameField sessionId={session.id} name={session.name ?? label} />
           ) : (
@@ -65,8 +65,9 @@ export function Tile({ session, model, project, active, framed, span, renaming }
           )}
           {model && <span className="tile-model">{model}</span>}
           <span className="tile-project">{project}</span>
-          <span className="tile-status">{STATUS_LABELS[session.status]}</span>
+          <span className="tile-status">{statusLabel(session)}</span>
           {session.unread && <span className="tile-badge" role="img" aria-label="Something new" />}
+          <SessionControls session={session} />
           <button
             type="button"
             className="icon-button tile-end"

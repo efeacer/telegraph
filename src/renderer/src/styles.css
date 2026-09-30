@@ -1819,3 +1819,118 @@ button:focus-visible {
 .card.more[open] summary {
   margin-bottom: 6px;
 }
+
+/* Pause, play and stop. */
+.session-controls {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.control-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 5px;
+  border-radius: 6px;
+  color: var(--slate);
+}
+
+.control-button:hover {
+  color: var(--paper);
+  background: var(--night-pressed);
+}
+
+.control-button:focus-visible {
+  outline: 2px solid var(--glass);
+  outline-offset: -2px;
+}
+
+.session-controls.is-labelled {
+  margin-left: 6px;
+  gap: 4px;
+}
+
+.session-controls.is-labelled .control-button {
+  height: 26px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--wire-faint);
+  font-size: var(--text-small);
+}
+
+/* In a row, the controls show where the end does: pointed at, or in front. */
+.session .session-controls {
+  opacity: 0;
+}
+
+.session:hover .session-controls,
+.session.is-active .session-controls,
+.session .session-controls:focus-within {
+  opacity: 1;
+}
+
+.session[data-paused] .session-status,
+.stage-status[data-status='paused'] {
+  color: var(--slate);
+}
+
+/* A paused session keys two short bars, as a pause is drawn. */
+.signal[data-status='paused'] .signal-mark {
+  width: 8px;
+  height: 9px;
+  border-left: 3px solid var(--slate);
+  border-right: 3px solid var(--slate);
+  border-radius: 1px;
+}
+
+/* The first start. */
+.welcome {
+  max-width: 560px;
+}
+
+.welcome > p {
+  margin: 8px 0 0;
+  color: var(--slate);
+}
+
+.welcome-steps {
+  display: grid;
+  gap: 18px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.welcome-steps li {
+  display: flex;
+  gap: 14px;
+}
+
+.welcome-steps h2 {
+  margin: 4px 0 2px;
+  font-size: var(--text-body);
+  font-weight: 650;
+  font-stretch: 100%;
+}
+
+.welcome-steps p {
+  margin: 0 0 10px;
+  font-size: var(--text-small);
+  line-height: 1.5;
+  color: var(--slate);
+}
+
+.welcome-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--glass);
+  background: var(--night-raised);
+}

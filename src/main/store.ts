@@ -53,6 +53,7 @@ function readLauncher(value: unknown): Launcher[] {
   if (typeof modelFlag === 'string') launcher.modelFlag = modelFlag
   if (typeof modelCommand === 'string') launcher.modelCommand = modelCommand
   if (typeof renameCommand === 'string') launcher.renameCommand = renameCommand
+  if (typeof value.interruptKey === 'string') launcher.interruptKey = value.interruptKey
   if (Array.isArray(providers)) {
     launcher.providers = providers.filter((provider) => typeof provider === 'string')
   }

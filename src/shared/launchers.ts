@@ -13,6 +13,7 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     id: CLAUDE_LAUNCHER_ID,
     name: 'Claude',
     command: 'claude',
+    interruptKey: '\u001b',
     modelFlag: '--model',
     modelCommand: '/model',
     renameCommand: '/rename',
@@ -35,6 +36,7 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     id: 'codex',
     name: 'Codex',
     command: 'codex',
+    interruptKey: '\u001b',
     modelFlag: '--model',
     providers: ['openai'],
     models: [],
@@ -47,6 +49,7 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     id: 'gemini',
     name: 'Gemini',
     command: 'gemini',
+    interruptKey: '\u001b',
     modelFlag: '--model',
     providers: ['google'],
     models: [

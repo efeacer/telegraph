@@ -257,7 +257,8 @@ export async function startSession(
     model,
     title: null,
     status: 'idle',
-    unread: false
+    unread: false,
+    paused: false
   }
   setState((state) => ({ ...state, sessions: [...state.sessions, session], error: null }))
   if (!quietly) activateSession(sessionId)
@@ -481,6 +482,41 @@ function typePending(sessionId: string, at: number): void {
   if (rest.length > 0) pendingLines.set(sessionId, rest)
 }
 
+export async function pauseSession(sessionId: string): Promise<void> {
+  if (!(await api.pauseSession(sessionId))) {
+    setState((state) => ({ ...state, error: 'Pausing is not possible on this system. Stop is.' }))
+    return
+  }
+  updateSession(sessionId, { paused: true })
+}
+
+export async function resumeSession(sessionId: string): Promise<void> {
+  if (!(await api.resumeSession(sessionId))) return
+  updateSession(sessionId, { paused: false })
+  // Quiet while paused, it is not taken to have gone quiet now.
+  const status = statuses.get(sessionId)
+  if (status) statuses.set(sessionId, { ...status, burstStartedAt: null, lastOutputAt: performance.now() })
+}
+
+/** Stops what the program is doing, as its own key for that does: Esc for agents, Ctrl-C for a shell. */
+export async function stopSession(sessionId: string): Promise<void> {
+  const state = getState()
+  const session = state.sessions.find((candidate) => candidate.id === sessionId)
+  if (!session || session.status === 'exited') return
+  // A frozen program would not hear it.
+  if (session.paused) await resumeSession(sessionId)
+  const launcher = state.launchers.find((candidate) => candidate.id === session.launcherId)
+  api.write(sessionId, launcher?.interruptKey ?? '\x03')
+  drafting.delete(sessionId)
+  focusActive()
+}
+
+function togglePause(sessionId: string | null): void {
+  const session = getState().sessions.find((candidate) => candidate.id === sessionId)
+  if (!session) return
+  void (session.paused ? resumeSession(session.id) : pauseSession(session.id))
+}
+
 function remember(projectId: string, launcherId: string, modelId: string | null): void {
   const models = { ...getState().choices[projectId]?.models }
   // A name that could not be a model's is not kept, and the one chosen before stays.
@@ -652,6 +688,8 @@ function countUnread(): void {
 function tick(): void {
   const at = performance.now()
   for (const sessionId of statuses.keys()) {
+    // A paused session is quiet because the user asked it to be, not because it waits.
+    if (getState().sessions.find((session) => session.id === sessionId)?.paused) continue
     track(sessionId, { type: 'tick', at, focused: isWatched(sessionId) })
   }
   for (const sessionId of pendingLines.keys()) typePending(sessionId, at)
@@ -724,6 +762,12 @@ function handleMenuCommand(command: MenuCommand): void {
       break
     case 'rename-session':
       startRenaming(activeSessionId)
+      break
+    case 'pause-session':
+      togglePause(activeSessionId)
+      break
+    case 'stop-session':
+      if (activeSessionId) void stopSession(activeSessionId)
       break
   }
 }

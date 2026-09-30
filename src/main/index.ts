@@ -519,6 +519,10 @@ function registerIpc(
     return true
   })
 
+  handle(IPC.pauseSession, (sessionId: unknown) => typeof sessionId === 'string' && sessions.pause(sessionId))
+
+  handle(IPC.resumeSession, (sessionId: unknown) => typeof sessionId === 'string' && sessions.resume(sessionId))
+
   listen(IPC.write, (sessionId: string, data: string) => sessions.write(sessionId, data))
 
   listen(IPC.resize, (sessionId: string, cols: number, rows: number) =>

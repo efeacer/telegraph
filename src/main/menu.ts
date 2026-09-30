@@ -55,6 +55,19 @@ export function buildMenu(options: MenuOptions): Menu {
           click: () => send({ type: 'clear' })
         },
         {
+          id: 'pause-session',
+          label: 'Pause or Resume',
+          accelerator: 'CmdOrCtrl+Shift+P',
+          click: () => send({ type: 'pause-session' })
+        },
+        {
+          id: 'stop-session',
+          label: 'Stop What It Is Doing',
+          accelerator: 'CmdOrCtrl+.',
+          click: () => send({ type: 'stop-session' })
+        },
+        { type: 'separator' },
+        {
           id: 'rename-session',
           label: 'Rename Session…',
           accelerator: 'CmdOrCtrl+Shift+R',

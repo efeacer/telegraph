@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { SessionStatus } from '@shared/status'
+import { STATUS_LABELS, type SessionStatus } from '@shared/status'
 import type { ThemeName } from '@shared/themes'
 import type {
   AgendaState,
@@ -27,6 +27,8 @@ export interface SessionView {
   status: SessionStatus
   /** Something happened in the session that the user has not seen yet. */
   unread: boolean
+  /** Frozen where it is, by the user. */
+  paused: boolean
 }
 
 export type Layout = 'single' | 'grid'
@@ -133,6 +135,11 @@ export function orderedSessions(current: AppState): SessionView[] {
  */
 export function modelOf(current: AppState, session: SessionView): string | null {
   return current.usage?.sessions[session.id]?.model ?? session.model?.name ?? null
+}
+
+/** What a session is doing, in words: its status, unless it is paused. */
+export function statusLabel(session: SessionView): string {
+  return session.paused && session.status !== 'exited' ? 'Paused' : STATUS_LABELS[session.status]
 }
 
 export function sessionLabel(session: SessionView): string {

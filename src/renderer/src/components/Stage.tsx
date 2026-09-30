@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef } from 'react'
-import { STATUS_LABELS } from '@shared/status'
 import { arrange } from '../arrange'
-import { addProject, attachTerminalHost, dismissError, toggleLayout } from '../controller'
+import { addProject, attachTerminalHost, dismissError, openConnections, toggleLayout } from '../controller'
 import { describeGit, shortenPath } from '../format'
-import { modelOf, orderedSessions, sessionLabel, type AppState } from '../store'
+import { modelOf, orderedSessions, sessionLabel, statusLabel, type AppState } from '../store'
 import { ModelSwitch } from './ModelSwitch'
+import { Icon, type IconName } from './Icon'
 import { Picker } from './Picker'
+import { SessionControls } from './SessionControls'
 import { Tile } from './Tile'
 import { Usage } from './Usage'
 
@@ -34,10 +35,11 @@ export function Stage({ state }: { state: AppState }) {
               {session && <span className="stage-session">{sessionLabel(session)}</span>}
               {session && <ModelSwitch state={state} session={session} />}
               {session && (
-                <span className="stage-status" data-status={session.status}>
-                  {STATUS_LABELS[session.status]}
+                <span className="stage-status" data-status={session.paused ? 'paused' : session.status}>
+                  {statusLabel(session)}
                 </span>
               )}
+              {session && <SessionControls session={session} labelled />}
             </div>
             <div className="stage-meta">
               {git && <span>{describeGit(git)}</span>}
@@ -115,7 +117,7 @@ export function Stage({ state }: { state: AppState }) {
                   {hasSessions ? 'Start a session in ' : 'No session open in '}
                   {project.name}
                 </h1>
-                <p>Choose what to run in this project's folder.</p>
+                <p>Choose an agent to work with in this folder, or a shell to type commands yourself.</p>
                 <Picker
                   key={project.id}
                   project={project}
@@ -125,19 +127,63 @@ export function Stage({ state }: { state: AppState }) {
                 />
               </>
             ) : (
-              <>
-                <h1>No projects yet</h1>
-                <p>Add a folder to start agents and shells in it.</p>
-                <div className="empty-actions">
-                  <button type="button" className="action-button" onClick={() => void addProject()}>
-                    Add project
-                  </button>
-                </div>
-              </>
+              <Welcome />
             )}
           </div>
         )}
       </div>
     </main>
+  )
+}
+
+const STEPS: { icon: IconName; title: string; text: string; action: string; run(): void }[] = [
+  {
+    icon: 'folder',
+    title: 'Add a project',
+    text: 'A project is a folder you work in: code, documents, anything. Agents work inside it.',
+    action: 'Add a project',
+    run: () => void addProject()
+  },
+  {
+    icon: 'sparkle',
+    title: 'Start an agent',
+    text: 'Pick an agent such as Claude, and tell it what you need in plain words. Pause, stop or end it any time.',
+    action: 'Add a project first',
+    run: () => void addProject()
+  },
+  {
+    icon: 'calendar',
+    title: 'Connect Google',
+    text: 'Optional. Your companion then knows your meetings and mail, and offers help before a meeting.',
+    action: 'Connect Google',
+    run: openConnections
+  }
+]
+
+/** What someone new sees: what Telegraph is, and what to do first, one step at a time. */
+function Welcome() {
+  return (
+    <div className="welcome">
+      <h1>Welcome to Telegraph</h1>
+      <p>A place to work with AI agents on your projects, and a companion that knows your day.</p>
+      <ol className="welcome-steps" aria-label="Getting started">
+        {STEPS.map((step, index) => (
+          <li key={step.title}>
+            <span className="welcome-mark" aria-hidden="true">
+              <Icon name={step.icon} />
+            </span>
+            <div>
+              <h2>{step.title}</h2>
+              <p>{step.text}</p>
+              {index !== 1 && (
+                <button type="button" className={index === 0 ? 'primary-button' : 'action-button'} onClick={step.run}>
+                  {step.action}
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
   )
 }

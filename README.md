@@ -43,6 +43,13 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Pause, stop and end
+
+Every session has a pause button, which freezes it where it is until you
+resume it, and a stop button, which stops what it is doing as Esc does and
+keeps the session open. The × ends it. They are in its row, its tile, and the
+header, and in the Session menu (⇧⌘P and ⌘.).
+
 ## Connecting Google
 
 Press **Connections** at the foot of the sidebar, then **Connect Google**, and
