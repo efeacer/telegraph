@@ -58,6 +58,39 @@ export interface DayTokens {
   models: Record<string, Tokens>
 }
 
+/** One limit of the plan: what may be used within a stretch of time. */
+export interface Limit {
+  /** From 0 to 100. */
+  usedPercent: number
+  /** When the limit starts over, if that is known. */
+  resetsAt: string | null
+}
+
+/** The limits of the plan, as a session last reported them. */
+export interface Limits {
+  fiveHour: Limit | null
+  week: Limit | null
+  /** When they were reported. */
+  at: string
+}
+
+/** What a session reports of itself. */
+export interface SessionMeter {
+  model: string | null
+  /** What the session would have cost at the prices of the list. */
+  costUsd: number | null
+  /** How full the context of the model is, from 0 to 100. */
+  contextPercent: number | null
+}
+
+/** What the agents have used. */
+export interface Usage {
+  limits: Limits | null
+  sessions: Record<string, SessionMeter>
+  /** The last seven days, the oldest first. */
+  days: DayTokens[]
+}
+
 /** A way to start a session. A null command starts a plain shell. */
 export interface Launcher {
   id: string
