@@ -38,6 +38,26 @@ export interface Chat {
   at: string
 }
 
+/** What answers took, in tokens. */
+export interface Tokens {
+  /** Read by the model for the first time. */
+  input: number
+  /** Written by the model. */
+  output: number
+  /** Read for the first time and kept, to be read again for less. */
+  cacheWrite: number
+  /** Read again from what was kept. */
+  cacheRead: number
+}
+
+/** What the answers of a day took, in all and by the model that gave them. */
+export interface DayTokens {
+  /** The day by the clock on the wall, as 2026-09-30. */
+  day: string
+  tokens: Tokens
+  models: Record<string, Tokens>
+}
+
 /** A way to start a session. A null command starts a plain shell. */
 export interface Launcher {
   id: string
