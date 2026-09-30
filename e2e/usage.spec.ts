@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { configDirOf, createWorkspace, launch, removeWorkspace, start, type Workspace } from './telegraph'
@@ -147,6 +147,20 @@ test('says so when a limit is running out', async () => {
   await expect(panel().getByRole('meter', { name: 'Weekly limit' })).toHaveAttribute('data-level', 'raised')
   await expect(panel()).toContainText('Nearly used up')
   await expect(panel()).toContainText('Running low')
+  // Said to a screen reader as well, which does not read what is inside a meter.
+  await expect(panel().getByRole('meter', { name: '5-hour limit' })).toHaveAttribute(
+    'aria-valuetext',
+    /^93% used, nearly used up, starts over in 2 h/
+  )
+})
+
+test('closes with Escape', async () => {
+  await open()
+  await chip().click()
+  await expect(panel()).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(panel()).toHaveCount(0)
+  await expect(chip()).toBeFocused()
 })
 
 test('shows what the session in front has cost and how full its context is', async () => {
@@ -178,6 +192,37 @@ test('stays open or collapsed as it was left', async () => {
   await open()
   await expect(chip()).toBeVisible()
   await expect(panel()).toHaveCount(0)
+})
+
+test('asks a session to report, unless the project has a status line of its own', async () => {
+  addLauncher({ id: 'asked', name: 'Asked', command: 'echo started with', reports: { kind: 'claude' } })
+  await open()
+  await start(page, 'Asked')
+  await expect(page.locator('.terminal-view.is-active .xterm-rows')).toContainText('started with --settings {"statusLine"')
+  await page.getByRole('button', { name: /^End / }).click()
+
+  mkdirSync(join(workspace.projectPath, '.claude'))
+  writeFileSync(join(workspace.projectPath, '.claude', 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'theirs' } }))
+  await start(page, 'Asked')
+  await expect(page.locator('.terminal-view.is-active .xterm-rows')).toContainText('started with')
+  await expect(page.locator('.terminal-view.is-active .xterm-rows')).not.toContainText('--settings')
+})
+
+test('keeps the limits of a session that has ended, and nothing else of it', async () => {
+  addLauncher(meter(42))
+  await open()
+  await start(page, 'Meter')
+  await expect(chip()).toContainText('42%')
+  await page.locator('.terminal-view.is-active .xterm-helper-textarea').focus()
+  await page.keyboard.type('exit')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.session')).toHaveAttribute('data-status', 'exited')
+
+  await expect.poll(() => readdirSync(join(workspace.userData, 'usage'))).toEqual(['_limits.json'])
+  await expect(chip()).toContainText('42%')
+  await app.close()
+  await open()
+  await expect(chip()).toContainText('42%')
 })
 
 test('hands every session the place to report to, and nothing of how it was started', async () => {

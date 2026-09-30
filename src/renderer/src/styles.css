@@ -971,6 +971,11 @@ button:focus-visible {
   color: var(--slate);
 }
 
+.usage-panel .usage-stale {
+  margin-top: 10px;
+  text-align: center;
+}
+
 .usage-limits {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1072,7 +1077,7 @@ button:focus-visible {
   visibility: visible;
 }
 
-.usage-week:hover .usage-day.is-today:not(:hover) .usage-day-value {
+.usage-week:hover .usage-day.is-today:not(:hover, :focus-visible) .usage-day-value {
   visibility: hidden;
 }
 

@@ -1,5 +1,4 @@
 import type { Launcher, Start } from './types'
-import { STATUS_LINE_SETTINGS } from './usage'
 
 export const SHELL_LAUNCHER_ID = 'shell'
 export const CLAUDE_LAUNCHER_ID = 'claude'
@@ -76,9 +75,6 @@ export function composeCommand(launcher: Launcher, start: Start): string | null 
   const mode = launcher.modes?.find((candidate) => candidate.id === start.modeId)
   if (launcher.chats && chatId) parts.push(launcher.chats.flag, quote(chatId))
   else if (mode) parts.push(mode.args)
-  if (launcher.reports?.kind === 'claude' && start.report) {
-    parts.push('--settings', quote(STATUS_LINE_SETTINGS))
-  }
   return parts.join(' ')
 }
 

@@ -7,17 +7,28 @@ const DAYS = 7
 const DEPTH = 4
 const ENDING = '.jsonl'
 const NEW_LINE = 0x0a
+// A record can be of any length. It is read a piece at a time, so that no more of it is held than that.
+const CHUNK_BYTES = 4 * 1024 * 1024
 
 export interface LedgerOptions {
   /** Where Claude Code keeps what it knows, which is `.claude` in the home folder unless it was moved. */
   configDir: string
   now?: () => Date
+  /** For how long what was read is given again without reading. Sessions report several times a second. */
+  freshForMs?: number
+  chunkBytes?: number
 }
 
 interface Answer {
   at: number
   model: string
   tokens: Tokens
+}
+
+/** How far a record has been read, and which file that was. */
+interface Place {
+  file: number
+  offset: number
 }
 
 /**
@@ -28,23 +39,30 @@ interface Answer {
  */
 export class TokenLedger {
   private readonly now: () => Date
-  /** How far each record has been read. */
-  private readonly readUpTo = new Map<string, number>()
+  private readonly chunkBytes: number
+  private readonly places = new Map<string, Place>()
   /** Answers by their id. One answer is written on several lines, and into more than one record. */
   private readonly answers = new Map<string, Answer>()
+  private last: { at: number; days: DayTokens[] } | null = null
 
   constructor(private readonly options: LedgerOptions) {
     this.now = options.now ?? (() => new Date())
+    this.chunkBytes = options.chunkBytes ?? CHUNK_BYTES
   }
 
   /** The last seven days, the oldest first. */
   async read(): Promise<DayTokens[]> {
     const today = this.now()
+    if (this.last && today.getTime() - this.last.at < (this.options.freshForMs ?? 0)) {
+      return this.last.days
+    }
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (DAYS - 1))
 
-    for (const path of await recordsIn(join(this.options.configDir, 'projects'), DEPTH)) {
-      await this.readOn(path, start.getTime()).catch(() => {})
-    }
+    const records = await recordsIn(join(this.options.configDir, 'projects'), DEPTH)
+    for (const path of records) await this.readOn(path, start.getTime()).catch(() => {})
+    // Records that are gone are not remembered.
+    const there = new Set(records)
+    for (const path of this.places.keys()) if (!there.has(path)) this.places.delete(path)
 
     const days = new Map<string, DayTokens>()
     for (let index = 0; index < DAYS; index++) {
@@ -60,25 +78,34 @@ export class TokenLedger {
       add(day.tokens, answer.tokens)
       add((day.models[answer.model] ??= none()), answer.tokens)
     }
-    return [...days.values()]
+    this.last = { at: today.getTime(), days: [...days.values()] }
+    return this.last.days
   }
 
   private async readOn(path: string, since: number): Promise<void> {
-    const { size, mtimeMs } = await stat(path)
+    const { size, mtimeMs, ino } = await stat(path)
     if (mtimeMs < since) return
-    let from = this.readUpTo.get(path) ?? 0
-    // Shorter than what was read of it: written anew.
-    if (size < from) from = 0
-    if (size === from) return
+    const place = this.places.get(path)
+    // Another file under the same name, or a shorter one than was read: written anew.
+    let offset = place && place.file === ino && size >= place.offset ? place.offset : 0
+    if (size === offset) return
 
     const file = await open(path, 'r')
     try {
-      const bytes = Buffer.alloc(size - from)
-      const { bytesRead } = await file.read(bytes, 0, bytes.length, from)
-      // A line is only read once it is whole.
-      const end = bytes.lastIndexOf(NEW_LINE, bytesRead - 1) + 1
-      for (const line of bytes.subarray(0, end).toString('utf8').split('\n')) this.take(line)
-      this.readUpTo.set(path, from + end)
+      // The start of a line that the piece before ended in the middle of.
+      let carried = Buffer.alloc(0)
+      while (offset + carried.length < size) {
+        const piece = Buffer.alloc(Math.min(this.chunkBytes, size - offset - carried.length))
+        const { bytesRead } = await file.read(piece, 0, piece.length, offset + carried.length)
+        if (bytesRead === 0) break
+        const bytes = Buffer.concat([carried, piece.subarray(0, bytesRead)])
+        // A line is only read once it is whole, which also keeps letters of several bytes together.
+        const end = bytes.lastIndexOf(NEW_LINE) + 1
+        for (const line of bytes.subarray(0, end).toString('utf8').split('\n')) this.take(line)
+        offset += end
+        carried = bytes.subarray(end)
+        this.places.set(path, { file: ino, offset })
+      }
     } finally {
       await file.close()
     }
@@ -93,7 +120,7 @@ export class TokenLedger {
     } catch {
       return
     }
-    const { type, timestamp, requestId, message } = (value ?? {}) as Record<string, unknown>
+    const { type, timestamp, message } = (value ?? {}) as Record<string, unknown>
     const { id, model, usage } = (message ?? {}) as Record<string, unknown>
     if (type !== 'assistant' || typeof id !== 'string' || typeof model !== 'string') return
     // Claude Code puts in answers of its own, which no model gave.
@@ -102,17 +129,25 @@ export class TokenLedger {
     if (Number.isNaN(at)) return
 
     const spent = usage as Record<string, unknown>
-    // The last line of an answer replaces the ones before: it is written when the answer is complete.
-    this.answers.set(`${id} ${typeof requestId === 'string' ? requestId : ''}`, {
-      at,
-      model,
-      tokens: {
-        input: count(spent.input_tokens),
-        output: count(spent.output_tokens),
-        cacheWrite: count(spent.cache_creation_input_tokens),
-        cacheRead: count(spent.cache_read_input_tokens)
+    const tokens: Tokens = {
+      input: count(spent.input_tokens),
+      output: count(spent.output_tokens),
+      cacheWrite: count(spent.cache_creation_input_tokens),
+      cacheRead: count(spent.cache_read_input_tokens)
+    }
+    // An answer is written as it is given, each line saying more than the one before, and the
+    // lines can lie in several records. Whichever is read last, the most that was said counts.
+    const before = this.answers.get(id)
+    if (before) {
+      before.tokens = {
+        input: Math.max(before.tokens.input, tokens.input),
+        output: Math.max(before.tokens.output, tokens.output),
+        cacheWrite: Math.max(before.tokens.cacheWrite, tokens.cacheWrite),
+        cacheRead: Math.max(before.tokens.cacheRead, tokens.cacheRead)
       }
-    })
+    } else {
+      this.answers.set(id, { at, model, tokens })
+    }
   }
 }
 

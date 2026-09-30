@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { withReporting } from '@shared/usage'
 import { Meters, STATUS_LINE_SETTINGS, USAGE_FILE_VARIABLE, hasOwnStatusLine } from './meters'
 
 const NOW = Date.parse('2026-09-30T12:00:00.000Z')
@@ -66,12 +67,38 @@ describe('Meters', () => {
     })
   })
 
-  it('takes the limits from the session that reported last', () => {
+  it('takes the most that any session knows to be used of a limit', () => {
+    // An idle session writes its report anew without knowing anything new.
+    report(FIRST, status({ rate_limits: { five_hour: { used_percentage: 80, resets_at: IN_TWO_HOURS } } }), 60)
+    report(SECOND, status({ rate_limits: { five_hour: { used_percentage: 12, resets_at: IN_TWO_HOURS } } }), 5)
+    const { limits } = open().read()
+    expect(limits?.fiveHour?.usedPercent).toBe(80)
+    expect(limits?.at).toBe(new Date(NOW - 60_000).toISOString())
+  })
+
+  it('goes by the session that knows the stretch of time that is running now', () => {
+    const anHourAgo = (NOW - 60 * 60 * 1000) / 1000
+    report(FIRST, status({ rate_limits: { five_hour: { used_percentage: 80, resets_at: IN_TWO_HOURS } } }), 60)
+    report(SECOND, status({ rate_limits: { five_hour: { used_percentage: 97, resets_at: anHourAgo } } }), 5)
+    expect(open().read().limits?.fiveHour).toEqual({
+      usedPercent: 80,
+      resetsAt: new Date(IN_TWO_HOURS * 1000).toISOString()
+    })
+  })
+
+  it('goes by the later stretch of time when sessions know of two', () => {
+    const inFourHours = IN_TWO_HOURS + 2 * 60 * 60
+    report(FIRST, status({ rate_limits: { five_hour: { used_percentage: 90, resets_at: IN_TWO_HOURS } } }), 5)
+    report(SECOND, status({ rate_limits: { five_hour: { used_percentage: 3, resets_at: inFourHours } } }), 60)
+    expect(open().read().limits?.fiveHour?.usedPercent).toBe(3)
+  })
+
+  it('knows each limit from whichever session knows it', () => {
     report(FIRST, status(), 600)
     report(SECOND, status({ rate_limits: { five_hour: { used_percentage: 50, resets_at: IN_TWO_HOURS } } }), 5)
     const { limits } = open().read()
     expect(limits?.fiveHour?.usedPercent).toBe(50)
-    expect(limits?.week).toBeNull()
+    expect(limits?.week?.usedPercent).toBe(18)
   })
 
   it('takes the limits from a session that knows them, when the last does not yet', () => {
@@ -127,15 +154,49 @@ describe('Meters', () => {
     expect(open().fileFor('')).toBeNull()
   })
 
-  it('clears out the reports of last week, but never the last one', () => {
-    report(FIRST, status(), 9 * 24 * 60 * 60)
-    report(SECOND, status(), 8 * 24 * 60 * 60)
-    open().clearOld()
-    expect(readdirSync(directory)).toEqual([`${SECOND}.json`])
+  it('keeps the limits of a session that has ended, and nothing else of it', () => {
+    report(FIRST, status({ cwd: '/Users/someone/secret-project', session_name: 'A private matter' }), 30)
+    const meters = open()
+    meters.retire(FIRST)
+
+    expect(readdirSync(directory)).toEqual(['_limits.json'])
+    expect(readFileSync(join(directory, '_limits.json'), 'utf8')).not.toMatch(/secret|private|Opus|4\.2/)
+    expect(meters.read()).toEqual({
+      limits: {
+        fiveHour: { usedPercent: 42.4, resetsAt: new Date(IN_TWO_HOURS * 1000).toISOString() },
+        week: { usedPercent: 18, resetsAt: new Date(ON_FRIDAY * 1000).toISOString() },
+        at: new Date(NOW - 30_000).toISOString()
+      },
+      sessions: {}
+    })
   })
 
-  it('has nothing to clear out before anything was reported', () => {
-    expect(() => open().clearOld()).not.toThrow()
+  it('weighs the limits it has kept against those of the sessions that go on', () => {
+    report(FIRST, status({ rate_limits: { five_hour: { used_percentage: 60, resets_at: IN_TWO_HOURS } } }), 30)
+    const meters = open()
+    meters.retire(FIRST)
+    report(SECOND, status({ rate_limits: { five_hour: { used_percentage: 75, resets_at: IN_TWO_HOURS } } }), 5)
+    expect(meters.read().limits?.fiveHour?.usedPercent).toBe(75)
+
+    meters.retire(SECOND)
+    expect(meters.read().limits?.fiveHour?.usedPercent).toBe(75)
+    expect(readdirSync(directory)).toEqual(['_limits.json'])
+  })
+
+  it('keeps the limits of the sessions that were going when it was last closed', () => {
+    report(FIRST, status(), 30)
+    report(SECOND, status({ rate_limits: undefined }), 5)
+    open().retireAll()
+    expect(readdirSync(directory)).toEqual(['_limits.json'])
+    expect(open().read().limits?.week?.usedPercent).toBe(18)
+  })
+
+  it('has nothing to keep of a session that never reported', () => {
+    const meters = open()
+    expect(() => meters.retire(FIRST)).not.toThrow()
+    expect(() => meters.retire('../../etc/passwd')).not.toThrow()
+    expect(() => meters.retireAll()).not.toThrow()
+    expect(meters.read().limits).toBeNull()
   })
 })
 
@@ -150,6 +211,17 @@ describe('hasOwnStatusLine', () => {
     mkdirSync(directory, { recursive: true })
     writeFileSync(join(directory, 'settings.json'), JSON.stringify({ model: 'opus' }))
     expect(hasOwnStatusLine(directory)).toBe(false)
+  })
+
+  it('is true in a project that has set up a status line for itself', () => {
+    const project = join(directory, 'project')
+    for (const name of ['settings.json', 'settings.local.json']) {
+      rmSync(join(project, '.claude'), { recursive: true, force: true })
+      mkdirSync(join(project, '.claude'), { recursive: true })
+      writeFileSync(join(project, '.claude', name), JSON.stringify({ statusLine: { type: 'command', command: 'theirs' } }))
+      expect(hasOwnStatusLine(directory, project), name).toBe(true)
+    }
+    expect(hasOwnStatusLine(directory, join(directory, 'another'))).toBe(false)
   })
 
   it('is false where there are no settings, or none that can be read', () => {
@@ -182,6 +254,10 @@ describe('what Claude Code is asked to do', () => {
     expect(printed).toBe('')
     expect(open().read().limits?.fiveHour?.usedPercent).toBe(42.4)
     expect(readdirSync(directory)).toEqual([`${FIRST}.json`])
+  })
+
+  it('is put after a command so that the session reports', () => {
+    expect(withReporting('claude --model opus')).toBe(`claude --model opus --settings '${STATUS_LINE_SETTINGS}'`)
   })
 
   it('does nothing where there is nowhere to report', async () => {

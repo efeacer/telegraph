@@ -92,3 +92,8 @@ export function modelName(id: string): string {
 export function newTokens(tokens: Tokens): number {
   return tokens.input + tokens.cacheWrite + tokens.output
 }
+
+/** A share as a whole figure. Nearly all is not all: only what is all used up reads 100. */
+export function wholePercent(percent: number): number {
+  return percent >= 100 ? 100 : Math.min(99, Math.round(percent))
+}

@@ -49,15 +49,24 @@ the session in `usage` in its user data folder. It prints nothing, so no
 line of status shows in the session. The settings of the user are not
 touched.
 
-- The limits are those of the account, so they are taken from the session
-  that reported last. Chats in other terminals count towards them and show
-  in them, as soon as a session started in Telegraph answers.
+- The limits are those of the account. Chats in other terminals count
+  towards them and show in them, as soon as a session started in Telegraph
+  answers.
+- A session knows a limit as of its last answer, and writes its report anew
+  without knowing anything new. So the report written last is not the one
+  that knows most. Telegraph goes by the stretch of time that is running
+  now, and within it by the most that any session has seen used.
+- When a session ends, what it knew of the limits is kept and the rest of
+  its report is removed: a report also holds the folder and the name of the
+  session, which Telegraph has no use for.
+- A reading older than five minutes is said to be old.
 - Claude Code reports the limits after its first answer, and only for plans
   that have them. Until then the panel says so.
 - A limit whose time to start over has passed counts as unused.
-- A user with a status line of their own keeps it: settings for a session
-  take the place of those of the user, so such sessions are not asked to
-  report, and the panel says why it shows no limits.
+- A status line the user or the project has set up is kept: settings for a
+  session would take its place, so such sessions are not asked to report,
+  and the panel says why it shows no limits. The main process decides this
+  as each session is started.
 - Launchers say whether their program reports: `"reports": { "kind": "claude" }`.
 
 ### The tokens
@@ -69,8 +78,11 @@ too, and so do the helpers of an agent.
 
 - An answer is written on several lines, and into more than one record. It
   is counted once, by its last line.
-- Records are read on from where they were read to, so looking again costs
-  next to nothing. A week of records is some tens of megabytes and takes a
+- An answer is written as it is given, each line saying more than the one
+  before. The most that any line says of it counts.
+- Records are read on from where they were read to, a few megabytes at a
+  time, so looking again costs next to nothing and a record of any length
+  can be read. A week of records is some tens of megabytes and takes a
   fraction of a second the first time.
 - A day is a day by the clock on the wall.
 - The figure for a day counts what was written and what was read for the
@@ -108,8 +120,6 @@ reached by keyboard, and every one is said to a screen reader.
   The cost of a session at list prices is shown, as Claude Code reports it.
 - A session started by typing `claude` in a shell does not report, since
   Telegraph did not start Claude and gave it no settings.
-- A project whose own settings name a status line loses it in sessions
-  started by Telegraph.
 
 ## Parts
 

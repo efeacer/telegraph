@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compact, describeAge, describeReset, modelName, newTokens } from './format'
+import { compact, describeAge, describeReset, modelName, newTokens, wholePercent } from './format'
 
 const NOW = new Date('2026-09-29T18:00:00')
 
@@ -98,5 +98,19 @@ describe('newTokens', () => {
     expect(newTokens({ input: 140, output: 47_600, cacheWrite: 1_050_000, cacheRead: 10_080_000 })).toBe(
       1_097_740
     )
+  })
+})
+
+describe('wholePercent', () => {
+  it('rounds to a whole figure', () => {
+    expect(wholePercent(42.4)).toBe(42)
+    expect(wholePercent(42.5)).toBe(43)
+    expect(wholePercent(0.2)).toBe(0)
+  })
+
+  it('says all of it is used only when all of it is', () => {
+    expect(wholePercent(99.5)).toBe(99)
+    expect(wholePercent(99.99)).toBe(99)
+    expect(wholePercent(100)).toBe(100)
   })
 })

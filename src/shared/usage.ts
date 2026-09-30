@@ -1,11 +1,14 @@
+import { quote } from './launchers'
+
 /** Names the file a session is to report its status to. Set for every session Telegraph starts. */
 export const USAGE_FILE_VARIABLE = 'TELEGRAPH_USAGE_FILE'
 
-// Written to the side and moved into place, so that the file is never read half written.
+// Written to the side and moved into place, so that the file is never read half written. The
+// name at the side is of the one run alone: an answer can start the command before the last has ended.
 // Nothing is printed, so that no line of status shows in the session.
 const REPORT = [
   `[ -n "$${USAGE_FILE_VARIABLE}" ] || exit 0`,
-  `cat > "$${USAGE_FILE_VARIABLE}.tmp" && mv "$${USAGE_FILE_VARIABLE}.tmp" "$${USAGE_FILE_VARIABLE}"`
+  `cat > "$${USAGE_FILE_VARIABLE}.$$.tmp" && mv "$${USAGE_FILE_VARIABLE}.$$.tmp" "$${USAGE_FILE_VARIABLE}"`
 ].join('; ')
 
 /**
@@ -17,3 +20,8 @@ const REPORT = [
 export const STATUS_LINE_SETTINGS = JSON.stringify({
   statusLine: { type: 'command', command: REPORT }
 })
+
+/** The command that starts Claude Code, with the session asked to report. */
+export function withReporting(command: string): string {
+  return `${command} --settings ${quote(STATUS_LINE_SETTINGS)}`
+}

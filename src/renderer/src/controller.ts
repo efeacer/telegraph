@@ -192,10 +192,9 @@ export async function startSession(
     command: composeCommand(launcher, {
       model: modelId,
       modeId: start.modeId ?? null,
-      chatId: start.chatId ?? null,
-      // Not asked of a user with a status line of their own, which the asking would take the place of.
-      report: current.usage?.reporting ?? false
+      chatId: start.chatId ?? null
     }),
+    reports: launcher.command === null ? null : (launcher.reports?.kind ?? null),
     cols: size.cols,
     rows: size.rows
   })

@@ -1,18 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type KeyboardEvent } from 'react'
 import type { DayTokens, Limit, SessionMeter, Usage as UsageData } from '@shared/types'
 import { refreshUsage } from '../controller'
-import { compact, describeReset, modelName, newTokens } from '../format'
+import { compact, describeAge, describeReset, modelName, newTokens, wholePercent } from '../format'
 
 const OPEN_KEY = 'telegraph.usage.open'
 // From where a limit is worth a look, and from where it is nearly gone.
 const RAISED = 75
 const HIGH = 90
+// A reading of the limits older than this is said to be old.
+const STALE_MS = 5 * 60_000
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 type Level = 'fine' | 'raised' | 'high'
 
+/** By the figure that is shown, so that the colour and the figure never disagree. */
 function levelOf(percent: number): Level {
-  return percent >= HIGH ? 'high' : percent >= RAISED ? 'raised' : 'fine'
+  const shown = wholePercent(percent)
+  return shown >= HIGH ? 'high' : shown >= RAISED ? 'raised' : 'fine'
 }
 
 /** Whether the panel was left open. Kept by the window, since it is about nothing but the window. */
@@ -33,9 +37,9 @@ interface UsageProps {
 /** What the agents have used: a mark in the corner that opens into a panel. */
 export function Usage({ usage, session }: UsageProps) {
   const [open, setOpen] = useState(wasOpen)
+  const panelId = useId()
 
-  const toggle = (): void => {
-    const next = !open
+  const show = (next: boolean): void => {
     setOpen(next)
     try {
       localStorage.setItem(OPEN_KEY, next ? 'yes' : 'no')
@@ -44,6 +48,10 @@ export function Usage({ usage, session }: UsageProps) {
     }
     // Chats in other terminals say nothing when they use something, so this is a moment to look.
     if (next) void refreshUsage()
+  }
+
+  const closeOnEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && open) show(false)
   }
 
   const today = usage?.days.at(-1)
@@ -56,28 +64,39 @@ export function Usage({ usage, session }: UsageProps) {
         className="usage-chip"
         aria-label={`Usage, ${describeChip(fiveHour, today)}`}
         aria-expanded={open}
-        onClick={toggle}
+        aria-controls={open ? panelId : undefined}
+        onClick={() => show(!open)}
+        onKeyDown={closeOnEscape}
       >
         {fiveHour ? (
           <>
             <Ring percent={fiveHour.usedPercent} size={16} stroke={3} />
-            <span>{Math.round(fiveHour.usedPercent)}%</span>
+            <span>{wholePercent(fiveHour.usedPercent)}%</span>
           </>
         ) : (
           <span>{today ? `${compact(newTokens(today.tokens))} tokens` : 'Usage'}</span>
         )}
       </button>
-      {open && usage && <Panel usage={usage} session={session} />}
+      {open && usage && (
+        <Panel id={panelId} usage={usage} session={session} onKeyDown={closeOnEscape} />
+      )}
     </>
   )
 }
 
 function describeChip(fiveHour: Limit | null, today: DayTokens | undefined): string {
-  if (fiveHour) return `${Math.round(fiveHour.usedPercent)}% of the 5-hour limit used`
+  if (fiveHour) return `${wholePercent(fiveHour.usedPercent)}% of the 5-hour limit used`
   return today ? `${compact(newTokens(today.tokens))} tokens today` : 'not read yet'
 }
 
-function Panel({ usage, session }: { usage: UsageData; session: SessionMeter | null }) {
+interface PanelProps {
+  id: string
+  usage: UsageData
+  session: SessionMeter | null
+  onKeyDown(event: KeyboardEvent): void
+}
+
+function Panel({ id, usage, session, onKeyDown }: PanelProps) {
   // The times until the limits start over are told in minutes, so they are told anew every minute.
   const [, setMinute] = useState(0)
   useEffect(() => {
@@ -89,12 +108,18 @@ function Panel({ usage, session }: { usage: UsageData; session: SessionMeter | n
   const today = days.at(-1)
 
   return (
-    <section className="usage-panel" role="region" aria-label="Usage">
+    <section className="usage-panel" id={id} role="region" aria-label="Usage" onKeyDown={onKeyDown}>
       {limits ? (
-        <div className="usage-limits">
-          {limits.fiveHour && <LimitMeter name="5-hour limit" limit={limits.fiveHour} />}
-          {limits.week && <LimitMeter name="Weekly limit" limit={limits.week} />}
-        </div>
+        <>
+          <div className="usage-limits">
+            {limits.fiveHour && <LimitMeter name="5-hour limit" limit={limits.fiveHour} />}
+            {limits.week && <LimitMeter name="Weekly limit" limit={limits.week} />}
+          </div>
+          {/* The limits are only as new as the last answer of a session started here. */}
+          {Date.now() - Date.parse(limits.at) > STALE_MS && (
+            <p className="usage-note usage-stale">As a session last reported {describeAge(limits.at)}.</p>
+          )}
+        </>
       ) : (
         <p className="usage-note">
           {reporting
@@ -123,7 +148,7 @@ function Panel({ usage, session }: { usage: UsageData; session: SessionMeter | n
           {session.contextPercent !== null && (
             <div className="usage-row">
               <Ring percent={session.contextPercent} size={16} stroke={3} />
-              <span>{Math.round(session.contextPercent)}% of its context is full</span>
+              <span>{wholePercent(session.contextPercent)}% of its context is full</span>
             </div>
           )}
           {session.costUsd !== null && (
@@ -138,10 +163,14 @@ Would be ${session.costUsd.toFixed(2)} at list prices. A plan is not billed by t
 }
 
 function LimitMeter({ name, limit }: { name: string; limit: Limit }) {
-  const percent = Math.round(limit.usedPercent)
+  const percent = wholePercent(limit.usedPercent)
   const level = levelOf(limit.usedPercent)
-  const reset = limit.resetsAt ? describeReset(limit.resetsAt) : ''
   const warning = level === 'high' ? 'Nearly used up' : level === 'raised' ? 'Running low' : ''
+  const reset = limit.resetsAt ? describeReset(limit.resetsAt) : ''
+  // Nothing is said of when a limit starts over where that is not known.
+  const when = reset ? `starts over ${reset}` : limit.usedPercent === 0 ? 'has started over' : ''
+  // What is inside a meter is not read out, so all that it says goes into its value.
+  const said = [`${percent}% used`, warning.toLowerCase(), when].filter(Boolean).join(', ')
 
   return (
     <div
@@ -151,7 +180,7 @@ function LimitMeter({ name, limit }: { name: string; limit: Limit }) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}
-      aria-valuetext={`${percent}% used${reset ? `, starts over ${reset}` : ''}`}
+      aria-valuetext={said}
       data-level={level}
     >
       <div className="usage-dial">
@@ -164,7 +193,7 @@ function LimitMeter({ name, limit }: { name: string; limit: Limit }) {
       <p className="usage-limit-name">{name}</p>
       {/* Said in words too: the colour of the ring is not all that tells a limit is running out. */}
       {warning && <p className="usage-warning">{warning}</p>}
-      <p className="usage-aside">{reset ? `starts over ${reset}` : 'has started over'}</p>
+      {when && <p className="usage-aside">{when}</p>}
     </div>
   )
 }

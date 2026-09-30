@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -135,6 +135,61 @@ describe('TokenLedger', () => {
     write('a.jsonl', [answer(at(0), { output: 10 }, { id: 'msg_shared' })])
     write('b.jsonl', [answer(at(0), { output: 10 }, { id: 'msg_shared' })])
     expect((await open().read()).at(-1)!.tokens.output).toBe(10)
+  })
+
+  it('counts an answer by its most complete line, whichever record is read last', async () => {
+    write('a.jsonl', [
+      answer(at(0), { input: 2, output: 1 }, { id: 'msg_forked' }),
+      answer(at(0), { input: 2, output: 500 }, { id: 'msg_forked' })
+    ])
+    // A record that was branched off while the answer was still being given.
+    write('b.jsonl', [answer(at(0), { input: 2, output: 1 }, { id: 'msg_forked' })])
+    expect((await open().read()).at(-1)!.tokens).toMatchObject({ input: 2, output: 500 })
+  })
+
+  it('counts an answer once when one of its lines does not say which request it was', async () => {
+    const whole = answer(at(0), { output: 10 }, { id: 'msg_same' })
+    const { requestId: _left, ...without } = JSON.parse(whole)
+    write('a.jsonl', [whole, JSON.stringify(without)])
+    expect((await open().read()).at(-1)!.tokens.output).toBe(10)
+  })
+
+  it('reads a record from the start when another file has taken its place', async () => {
+    const path = write('a.jsonl', [answer(at(0), { output: 10 })])
+    const ledger = open()
+    await ledger.read()
+
+    // Longer than the one before, so that its length does not give it away.
+    const other = write('other.tmp', [answer(at(0), { output: 1 }), answer(at(0), { output: 2 }), answer(at(0), { output: 4 })])
+    renameSync(other, path)
+    expect((await ledger.read()).at(-1)!.tokens.output).toBe(17)
+  })
+
+  it('reads a long record a piece at a time', async () => {
+    const lines = Array.from({ length: 400 }, () => answer(at(0), { output: 1 }))
+    write('a.jsonl', lines)
+    const ledger = new TokenLedger({ configDir, now: () => NOW, chunkBytes: 1000 })
+    expect((await ledger.read()).at(-1)!.tokens.output).toBe(400)
+  })
+
+  it('reads a line that is longer than a piece', async () => {
+    const long = JSON.stringify({ type: 'user', message: { content: 'x'.repeat(5000) } })
+    write('a.jsonl', [answer(at(0), { output: 1 }), long, answer(at(0), { output: 2 }), `${long}ü`, answer(at(0), { output: 4 })])
+    const ledger = new TokenLedger({ configDir, now: () => NOW, chunkBytes: 1000 })
+    expect((await ledger.read()).at(-1)!.tokens.output).toBe(7)
+  })
+
+  it('gives what it read a moment ago, without reading again', async () => {
+    const path = write('a.jsonl', [answer(at(0), { output: 10 })])
+    let now = NOW
+    const ledger = new TokenLedger({ configDir, now: () => now, freshForMs: 5_000 })
+    await ledger.read()
+
+    appendFileSync(path, `${answer(at(0), { output: 5 })}\n`)
+    now = new Date(NOW.getTime() + 2_000)
+    expect((await ledger.read()).at(-1)!.tokens.output).toBe(10)
+    now = new Date(NOW.getTime() + 6_000)
+    expect((await ledger.read()).at(-1)!.tokens.output).toBe(15)
   })
 
   it('counts what the helpers of an agent took', async () => {

@@ -15,6 +15,7 @@ import {
   type IpcMainInvokeEvent
 } from 'electron'
 import { checkWindowReport, describeProblem, type LogEntry } from '@shared/buglog'
+import { withReporting } from '@shared/usage'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
 import { Attachments } from './attachments'
@@ -75,7 +76,8 @@ let pageReports = false
 // Claude Code keeps its records in the home folder unless it is told another place.
 const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'), '.claude')
 const meters = new Meters({ directory: join(app.getPath('userData'), 'usage') })
-const ledger = new TokenLedger({ configDir: claudeConfigDir })
+// Sessions report several times a second while agents work, and the window asks each time.
+const ledger = new TokenLedger({ configDir: claudeConfigDir, freshForMs: 5_000 })
 let readingDays: ReturnType<TokenLedger['read']> | null = null
 
 /** One reading at a time: the ledger reads on from where it was, and two readers would count twice. */
@@ -88,7 +90,10 @@ function readDays(): ReturnType<TokenLedger['read']> {
 
 const sessions = new PtyManager(app.getVersion(), {
   onData: (sessionId, data) => send(IPC.sessionData, sessionId, data),
-  onExit: (sessionId, exitCode) => send(IPC.sessionExit, sessionId, exitCode),
+  onExit: (sessionId, exitCode) => {
+    meters.retire(sessionId)
+    send(IPC.sessionExit, sessionId, exitCode)
+  },
   usageFileFor: (sessionId) => meters.fileFor(sessionId)
 })
 
@@ -177,7 +182,7 @@ function registerIpc(
 
   handle(IPC.createSession, (request: CreateSessionRequest): CreateSessionResult => {
     try {
-      sessions.create(request)
+      sessions.create({ ...request, command: commandFor(request) })
       return { ok: true }
     } catch (error) {
       bugLog.record({ kind: 'session-failure', ...describeProblem(error) })
@@ -220,6 +225,18 @@ function registerIpc(
   listen(IPC.reporting, () => {
     pageReports = true
   })
+}
+
+/**
+ * The command of a session, with Claude Code asked to report what it uses.
+ * Decided here and as the session is started: asking takes the place of a
+ * status line the user or the project has set up, so where there is one,
+ * the session is left as it is.
+ */
+function commandFor(request: CreateSessionRequest): string | null {
+  if (request.command === null || request.reports !== 'claude') return request.command
+  if (hasOwnStatusLine(claudeConfigDir, request.cwd)) return request.command
+  return withReporting(request.command)
 }
 
 /**
@@ -368,7 +385,7 @@ if (!app.requestSingleInstanceLock()) {
 
   bugLog.start()
   attachments.clearOld()
-  meters.clearOld()
+  meters.retireAll()
   meters.watch(() => send(IPC.usageChanged))
   // A week of records takes a moment to read the first time, so that starts before the window asks.
   void readDays().catch(() => {})

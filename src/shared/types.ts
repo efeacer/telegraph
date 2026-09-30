@@ -124,8 +124,6 @@ export interface Start {
   modeId: string | null
   /** A chat that was had before, to go on with. Takes the place of the mode. */
   chatId?: string | null
-  /** Whether the session is asked to report what it uses. */
-  report?: boolean
 }
 
 /** What was last chosen in a project. */
@@ -152,6 +150,8 @@ export interface CreateSessionRequest {
   sessionId: string
   cwd: string
   command: string | null
+  /** How the program can be asked to report what it uses, if it can. */
+  reports?: Reports['kind'] | null
   cols: number
   rows: number
 }

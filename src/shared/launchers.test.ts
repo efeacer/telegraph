@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LAUNCHERS, composeCommand, programOf, quote } from './launchers'
-import { STATUS_LINE_SETTINGS } from './usage'
 import type { Launcher } from './types'
 
 const claude: Launcher = {
@@ -72,23 +71,6 @@ describe('composeCommand', () => {
     expect(composeCommand(remembering, { model: null, modeId: null, chatId: 'x; rm -rf ~' })).toBe(
       "claude --resume 'x; rm -rf ~'"
     )
-  })
-
-  it('asks a session to report, after all that was chosen', () => {
-    const reporting = { ...claude, reports: { kind: 'claude' as const } }
-    expect(composeCommand(reporting, { model: 'opus', modeId: 'continue', report: true })).toBe(
-      `claude --model 'opus' --continue --settings ${quote(STATUS_LINE_SETTINGS)}`
-    )
-  })
-
-  it('does not ask a session to report unless told to', () => {
-    const reporting = { ...claude, reports: { kind: 'claude' as const } }
-    expect(composeCommand(reporting, { model: null, modeId: null })).toBe('claude')
-    expect(composeCommand(reporting, { model: null, modeId: null, report: false })).toBe('claude')
-  })
-
-  it('does not ask a launcher to report that cannot', () => {
-    expect(composeCommand(claude, { model: null, modeId: null, report: true })).toBe('claude')
   })
 
   it('passes no model to a launcher that cannot take one', () => {
