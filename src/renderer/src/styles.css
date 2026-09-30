@@ -1326,3 +1326,56 @@ button:focus-visible {
   color: #fff;
   background: var(--stop);
 }
+
+/* The model a session runs on, after what it is doing. */
+.session-model::before,
+.tile-model::before {
+  content: '·';
+  margin: 0 5px;
+  color: var(--slate);
+}
+
+.session-model {
+  color: var(--slate);
+}
+
+.session-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-model {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: -8px;
+}
+
+/* In the header the model is a blank to fill in, smaller than those of the choice of what to start. */
+.stage-model .blank-value {
+  font-size: var(--text-small);
+  font-weight: 500;
+  color: var(--slate);
+  border-bottom-color: var(--wire-faint);
+}
+
+.stage-model .blank-value:hover,
+.stage-model .blank-value[aria-expanded='true'] {
+  color: var(--paper);
+}
+
+.stage-model .blank-list {
+  -webkit-app-region: no-drag;
+}
+
+.stage-model .blank {
+  -webkit-app-region: no-drag;
+}
+
+@container (max-width: 330px) {
+  .tile-model {
+    display: none;
+  }
+}

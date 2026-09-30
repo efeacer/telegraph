@@ -27,6 +27,8 @@ const SESSION_ENDED_NOTE = '\r\n\x1b[2mSession ended.\x1b[0m\r\n'
 const api = window.telegraph
 const terminals = new TerminalManager({ useGpu: !api.e2e })
 const statuses = new Map<string, StatusState>()
+/** Sessions into which something has been typed and not yet sent. */
+const drafting = new Set<string>()
 
 export function attachTerminalHost(host: HTMLElement): void {
   terminals.attach(host)
@@ -189,6 +191,7 @@ export async function startSession(
   const sessionId = crypto.randomUUID()
   const size = terminals.create(sessionId, {
     onInput: (data) => {
+      noteDraft(sessionId, data)
       api.write(sessionId, data)
       track(sessionId, { type: 'input', at: performance.now() })
     },
@@ -203,6 +206,7 @@ export async function startSession(
   const session: SessionView = {
     id: sessionId,
     projectId,
+    launcherId: launcher.id,
     launcherName: launcher.name,
     model,
     title: null,
@@ -255,6 +259,54 @@ async function attach(sessionId: string, files: File[]): Promise<void> {
       error: `Could not attach ${refused.join(', ')}. Only images can be pasted: a file of another kind has to be dropped, or copied as a file.`
     }))
   }
+}
+
+/**
+ * Whether something is being typed. Enter sends it, and Ctrl-C or Ctrl-U
+ * throw it away. Keys that move or delete leave it as it was, since what is
+ * left of it cannot be told.
+ */
+function noteDraft(sessionId: string, data: string): void {
+  if (data.endsWith('\r') || data === '\x03' || data === '\x15') drafting.delete(sessionId)
+  else if (!data.startsWith('\x1b') && data !== '\x7f' && /[^\x00-\x1f]/.test(data)) drafting.add(sessionId)
+}
+
+/**
+ * Changes the model of a running session, the way the user would: by typing
+ * the command of its program. Not while the agent works, which it would
+ * take for a message, nor while something is typed, which the command would
+ * be added to.
+ */
+export function switchModel(sessionId: string, modelId: string): void {
+  const state = getState()
+  const session = state.sessions.find((candidate) => candidate.id === sessionId)
+  const launcher = state.launchers.find((candidate) => candidate.id === session?.launcherId)
+  if (!session || !launcher?.modelCommand || !isModelId(modelId)) return
+
+  const refuse = (error: string): void => setState((current) => ({ ...current, error }))
+  if (session.status === 'working') {
+    return refuse(`${sessionLabel(session)} is working. Change its model once it waits for you.`)
+  }
+  if (session.status === 'exited') return refuse(`${sessionLabel(session)} has ended.`)
+  if (drafting.has(sessionId)) {
+    return refuse('Send or clear what you have typed in the session first, then change its model.')
+  }
+
+  api.write(sessionId, `${launcher.modelCommand} ${modelId}\r`)
+  const model = modelsFor(launcher, state.catalogue).find((known) => known.id === modelId) ?? {
+    id: modelId,
+    name: modelId
+  }
+  updateSession(sessionId, { model })
+  // Until the session reports again, what it reported would name the model it was on.
+  setState((current) => {
+    const reported = current.usage?.sessions[sessionId]
+    if (!current.usage || !reported) return current
+    const sessions = { ...current.usage.sessions, [sessionId]: { ...reported, model: null } }
+    return { ...current, usage: { ...current.usage, sessions } }
+  })
+  remember(session.projectId, launcher.id, modelId)
+  terminals.focus(sessionId)
 }
 
 function remember(projectId: string, launcherId: string, modelId: string | null): void {
@@ -340,6 +392,7 @@ function discardSession(sessionId: string): void {
 
   terminals.dispose(sessionId)
   statuses.delete(sessionId)
+  drafting.delete(sessionId)
   setState((state) => ({
     ...state,
     sessions: state.sessions.filter((session) => session.id !== sessionId),

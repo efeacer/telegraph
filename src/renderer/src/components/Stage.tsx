@@ -3,7 +3,8 @@ import { STATUS_LABELS } from '@shared/status'
 import { arrange } from '../arrange'
 import { addProject, attachTerminalHost, dismissError, toggleLayout } from '../controller'
 import { describeGit, shortenPath } from '../format'
-import { orderedSessions, sessionLabel, type AppState } from '../store'
+import { modelOf, orderedSessions, sessionLabel, type AppState } from '../store'
+import { ModelSwitch } from './ModelSwitch'
 import { Picker } from './Picker'
 import { Tile } from './Tile'
 import { Usage } from './Usage'
@@ -31,7 +32,7 @@ export function Stage({ state }: { state: AppState }) {
             <div className="stage-title">
               <span className="stage-project">{project.name}</span>
               {session && <span className="stage-session">{sessionLabel(session)}</span>}
-              {session?.model && <span className="stage-model">{session.model.name}</span>}
+              {session && <ModelSwitch state={state} session={session} />}
               {session && (
                 <span className="stage-status" data-status={session.status}>
                   {STATUS_LABELS[session.status]}
@@ -90,6 +91,7 @@ export function Stage({ state }: { state: AppState }) {
               <Tile
                 key={shownSession.id}
                 session={shownSession}
+                model={modelOf(state, shownSession)}
                 project={
                   state.projects.find((candidate) => candidate.id === shownSession.projectId)?.name ?? ''
                 }

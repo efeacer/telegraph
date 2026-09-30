@@ -43,6 +43,12 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## The model of a session
+
+Every session shows its model in the sidebar and in its tile. For a Claude
+session, the model in the header opens a list to change it without ending
+the session, once the agent waits for you and nothing is half typed.
+
 ## Sessions side by side
 
 The button in the top right corner, or View > Sessions Side by Side (⇧⌘G),

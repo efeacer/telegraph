@@ -107,6 +107,8 @@ export interface Launcher {
   command: string | null
   /** Goes before the model on the command line. Without it there is no model to choose. */
   modelFlag?: string
+  /** Typed into a running session, followed by a model, to change to that model. */
+  modelCommand?: string
   /** The providers in the catalogue whose models the program runs. */
   providers?: string[]
   /** Models offered first, and the only ones offered without the catalogue. */

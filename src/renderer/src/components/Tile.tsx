@@ -6,6 +6,7 @@ import { Signal } from './Signal'
 
 interface TileProps {
   session: SessionView
+  model: string | null
   /** The name of the project, where sessions of several projects are shown together. */
   project: string
   active: boolean
@@ -16,7 +17,7 @@ interface TileProps {
 }
 
 /** The place of a session on the stage. Its terminal lives outside React, and is moved in and out. */
-export function Tile({ session, project, active, framed, span }: TileProps) {
+export function Tile({ session, model, project, active, framed, span }: TileProps) {
   const body = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -50,6 +51,7 @@ export function Tile({ session, project, active, framed, span }: TileProps) {
         >
           <Signal status={session.status} />
           <span className="tile-title">{label}</span>
+          {model && <span className="tile-model">{model}</span>}
           <span className="tile-project">{project}</span>
           <span className="tile-status">{STATUS_LABELS[session.status]}</span>
           {session.unread && <span className="tile-badge" role="img" aria-label="Something new" />}

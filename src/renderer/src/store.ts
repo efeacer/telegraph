@@ -5,6 +5,7 @@ import type { Catalogue, Choice, GitStatus, Launcher, Model, Project, Usage } fr
 export interface SessionView {
   id: string
   projectId: string
+  launcherId: string
   launcherName: string
   /** The model the session was started on, unless the program chose it. */
   model: Model | null
@@ -99,6 +100,14 @@ export function orderedSessions(current: AppState): SessionView[] {
   return current.projects.flatMap((project) =>
     current.sessions.filter((session) => session.projectId === project.id)
   )
+}
+
+/**
+ * The name of the model a session runs on: as the session reports it, which
+ * is so whichever way it was changed, or else as it was chosen.
+ */
+export function modelOf(current: AppState, session: SessionView): string | null {
+  return current.usage?.sessions[session.id]?.model ?? session.model?.name ?? null
 }
 
 export function sessionLabel(session: SessionView): string {

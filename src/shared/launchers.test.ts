@@ -142,6 +142,11 @@ describe('the launchers Telegraph comes with', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  it('know how Claude is told to change model while it runs', () => {
+    const claudeLauncher = DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'claude')
+    expect(claudeLauncher?.modelCommand).toBe('/model')
+  })
+
   it('know that Claude can report its limits', () => {
     const claudeLauncher = DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'claude')
     expect(claudeLauncher?.reports).toEqual({ kind: 'claude' })

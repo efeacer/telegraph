@@ -2,7 +2,7 @@ import { STATUS_LABELS } from '@shared/status'
 import type { GitStatus, Launcher, Project } from '@shared/types'
 import { activateSession, addProject, endSession, selectProject } from '../controller'
 import { describeGit } from '../format'
-import { sessionLabel, type AppState, type SessionView } from '../store'
+import { modelOf, sessionLabel, type AppState, type SessionView } from '../store'
 import { ProjectMenu } from './ProjectMenu'
 import { Signal } from './Signal'
 
@@ -18,6 +18,7 @@ export function Sidebar({ state }: { state: AppState }) {
             launchers={state.launchers}
             git={state.git[project.id] ?? null}
             sessions={state.sessions.filter((session) => session.projectId === project.id)}
+            modelOf={(session) => modelOf(state, session)}
             activeSessionId={state.activeSessionId}
             selected={state.selectedProjectId === project.id}
           />
@@ -39,10 +40,11 @@ interface ProjectGroupProps {
   sessions: SessionView[]
   activeSessionId: string | null
   selected: boolean
+  modelOf(session: SessionView): string | null
 }
 
 function ProjectGroup(props: ProjectGroupProps) {
-  const { project, launchers, git, sessions, activeSessionId, selected } = props
+  const { project, launchers, git, sessions, activeSessionId, selected, modelOf: model } = props
   const unread = sessions.filter((session) => session.unread).length
   return (
     <section className={selected ? 'project is-selected' : 'project'}>
@@ -68,7 +70,12 @@ function ProjectGroup(props: ProjectGroupProps) {
       {sessions.length > 0 && (
         <ul className="wire">
           {sessions.map((session) => (
-            <SessionRow key={session.id} session={session} active={session.id === activeSessionId} />
+            <SessionRow
+              key={session.id}
+              session={session}
+              model={model(session)}
+              active={session.id === activeSessionId}
+            />
           ))}
         </ul>
       )}
@@ -76,7 +83,13 @@ function ProjectGroup(props: ProjectGroupProps) {
   )
 }
 
-function SessionRow({ session, active }: { session: SessionView; active: boolean }) {
+interface SessionRowProps {
+  session: SessionView
+  model: string | null
+  active: boolean
+}
+
+function SessionRow({ session, model, active }: SessionRowProps) {
   const label = sessionLabel(session)
   return (
     <li className={active ? 'session is-active' : 'session'} data-status={session.status}>
@@ -89,7 +102,10 @@ function SessionRow({ session, active }: { session: SessionView; active: boolean
         <Signal status={session.status} />
         <span className="session-text">
           <span className="session-title">{label}</span>
-          <span className="session-status">{STATUS_LABELS[session.status]}</span>
+          <span className="session-status">
+            {STATUS_LABELS[session.status]}
+            {model && <span className="session-model">{model}</span>}
+          </span>
         </span>
         {session.unread && <span className="session-badge" role="img" aria-label="Something new" />}
       </button>

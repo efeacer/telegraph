@@ -151,7 +151,8 @@ describe('parseState', () => {
       models: [{ id: 'gpt-6-sol', name: 'GPT-6 Sol' }],
       modes: [{ id: 'restore', name: 'restore chat history', args: '--restore-chat-history' }],
       chats: { kind: 'claude', flag: '--resume' },
-      reports: { kind: 'claude' }
+      reports: { kind: 'claude' },
+      modelCommand: '/model'
     }
     expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([launcher])
   })

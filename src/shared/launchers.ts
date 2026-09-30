@@ -14,6 +14,7 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     name: 'Claude',
     command: 'claude',
     modelFlag: '--model',
+    modelCommand: '/model',
     providers: ['anthropic'],
     // Names that stand for the latest model of a kind, so they do not go out of date.
     models: [
