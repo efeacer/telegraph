@@ -150,9 +150,19 @@ describe('parseState', () => {
       providers: ['openai'],
       models: [{ id: 'gpt-6-sol', name: 'GPT-6 Sol' }],
       modes: [{ id: 'restore', name: 'restore chat history', args: '--restore-chat-history' }],
-      chats: { kind: 'claude', flag: '--resume' }
+      chats: { kind: 'claude', flag: '--resume' },
+      reports: { kind: 'claude' }
     }
     expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([launcher])
+  })
+
+  it('drops a way of reporting it does not know', () => {
+    for (const reports of [{ kind: 'other' }, 'claude', null]) {
+      const launcher = { id: 'a', name: 'A', command: 'a', reports }
+      expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([
+        { id: 'a', name: 'A', command: 'a' }
+      ])
+    }
   })
 
   it('drops a way of keeping chats it does not know', () => {

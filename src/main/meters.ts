@@ -80,6 +80,15 @@ export class Meters {
   }
 }
 
+/**
+ * True for a user who has set up a status line of their own. Settings given
+ * for one session take the place of it, so sessions of such a user are not
+ * asked to report.
+ */
+export function hasOwnStatusLine(configDir: string): boolean {
+  return parse(join(configDir, 'settings.json'))?.statusLine !== undefined
+}
+
 // What Claude Code hands over is its own, and read as far as it can be made out.
 function parse(path: string): Record<string, unknown> | null {
   try {

@@ -30,6 +30,12 @@ export interface ChatRecords {
   flag: string
 }
 
+/** How a program can be asked to report the limits of the plan and what a session has used. */
+export interface Reports {
+  /** Whose way of reporting it is. That of Claude Code is the one Telegraph knows. */
+  kind: 'claude'
+}
+
 /** A chat that was had before and can be opened again. */
 export interface Chat {
   id: string
@@ -89,6 +95,8 @@ export interface Usage {
   sessions: Record<string, SessionMeter>
   /** The last seven days, the oldest first. */
   days: DayTokens[]
+  /** False when sessions are not asked to report, because the user has a status line of their own. */
+  reporting: boolean
 }
 
 /** A way to start a session. A null command starts a plain shell. */
@@ -104,6 +112,7 @@ export interface Launcher {
   models?: Model[]
   modes?: Mode[]
   chats?: ChatRecords
+  reports?: Reports
 }
 
 /** The models of each provider, newest first. */
@@ -115,6 +124,8 @@ export interface Start {
   modeId: string | null
   /** A chat that was had before, to go on with. Takes the place of the mode. */
   chatId?: string | null
+  /** Whether the session is asked to report what it uses. */
+  report?: boolean
 }
 
 /** What was last chosen in a project. */
@@ -170,6 +181,7 @@ export interface TelegraphApi {
   saveChoice(projectId: string, choice: Choice): void
   /** The chats a launcher has had in a project, the latest first. None if it keeps none. */
   listChats(projectId: string, launcherId: string): Promise<Chat[]>
+  readUsage(): Promise<Usage>
   gitStatus(projectPath: string): Promise<GitStatus | null>
   createSession(request: CreateSessionRequest): Promise<CreateSessionResult>
   /** Resolves to false when the user chose to keep the session running. */

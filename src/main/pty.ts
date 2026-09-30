@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import * as pty from 'node-pty'
 import type { CreateSessionRequest } from '@shared/types'
+import { USAGE_FILE_VARIABLE } from '@shared/usage'
 import { buildSessionEnv, buildShellInvocation, shellName } from './shell'
 
 // Output is collected for a frame before it crosses to the window, so a
@@ -17,6 +18,8 @@ interface Session {
 export interface SessionEvents {
   onData(sessionId: string, data: string): void
   onExit(sessionId: string, exitCode: number): void
+  /** The file the session is to report what it uses to, if there is one. */
+  usageFileFor?(sessionId: string): string | null
 }
 
 export class PtyManager {
@@ -40,12 +43,13 @@ export class PtyManager {
       request.command,
       buildSessionEnv(process.env, this.appVersion)
     )
+    const usageFile = this.events.usageFileFor?.(request.sessionId)
     const child = pty.spawn(invocation.file, invocation.args, {
       name: 'xterm-256color',
       cols: request.cols,
       rows: request.rows,
       cwd: request.cwd,
-      env: invocation.env
+      env: usageFile ? { ...invocation.env, [USAGE_FILE_VARIABLE]: usageFile } : invocation.env
     })
 
     const session: Session = {

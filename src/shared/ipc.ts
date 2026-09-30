@@ -6,6 +6,7 @@ export const IPC = {
   loadCatalogue: 'models:load',
   saveChoice: 'choices:save',
   listChats: 'chats:list',
+  readUsage: 'usage:read',
   saveAttachment: 'attachments:save',
   gitStatus: 'git:status',
   createSession: 'session:create',

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, wr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Meters, STATUS_LINE_SETTINGS, USAGE_FILE_VARIABLE } from './meters'
+import { Meters, STATUS_LINE_SETTINGS, USAGE_FILE_VARIABLE, hasOwnStatusLine } from './meters'
 
 const NOW = Date.parse('2026-09-30T12:00:00.000Z')
 const IN_TWO_HOURS = (NOW + 2 * 60 * 60 * 1000) / 1000
@@ -136,6 +136,27 @@ describe('Meters', () => {
 
   it('has nothing to clear out before anything was reported', () => {
     expect(() => open().clearOld()).not.toThrow()
+  })
+})
+
+describe('hasOwnStatusLine', () => {
+  it('is true for a user who has set up a status line', () => {
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'mine' } }))
+    expect(hasOwnStatusLine(directory)).toBe(true)
+  })
+
+  it('is false for a user who has not', () => {
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'settings.json'), JSON.stringify({ model: 'opus' }))
+    expect(hasOwnStatusLine(directory)).toBe(false)
+  })
+
+  it('is false where there are no settings, or none that can be read', () => {
+    expect(hasOwnStatusLine(directory)).toBe(false)
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'settings.json'), '{ cut short')
+    expect(hasOwnStatusLine(directory)).toBe(false)
   })
 })
 

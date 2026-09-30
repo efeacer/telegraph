@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LAUNCHERS, composeCommand, programOf, quote } from './launchers'
+import { STATUS_LINE_SETTINGS } from './usage'
 import type { Launcher } from './types'
 
 const claude: Launcher = {
@@ -73,6 +74,23 @@ describe('composeCommand', () => {
     )
   })
 
+  it('asks a session to report, after all that was chosen', () => {
+    const reporting = { ...claude, reports: { kind: 'claude' as const } }
+    expect(composeCommand(reporting, { model: 'opus', modeId: 'continue', report: true })).toBe(
+      `claude --model 'opus' --continue --settings ${quote(STATUS_LINE_SETTINGS)}`
+    )
+  })
+
+  it('does not ask a session to report unless told to', () => {
+    const reporting = { ...claude, reports: { kind: 'claude' as const } }
+    expect(composeCommand(reporting, { model: null, modeId: null })).toBe('claude')
+    expect(composeCommand(reporting, { model: null, modeId: null, report: false })).toBe('claude')
+  })
+
+  it('does not ask a launcher to report that cannot', () => {
+    expect(composeCommand(claude, { model: null, modeId: null, report: true })).toBe('claude')
+  })
+
   it('passes no model to a launcher that cannot take one', () => {
     const greeter: Launcher = { id: 'greeter', name: 'Greeter', command: 'echo hello' }
     expect(composeCommand(greeter, { model: 'opus', modeId: null })).toBe('echo hello')
@@ -140,6 +158,11 @@ describe('the launchers Telegraph comes with', () => {
   it('have ids of their own', () => {
     const ids = DEFAULT_LAUNCHERS.map((launcher) => launcher.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('know that Claude can report its limits', () => {
+    const claudeLauncher = DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'claude')
+    expect(claudeLauncher?.reports).toEqual({ kind: 'claude' })
   })
 
   it('know how Claude keeps its chats', () => {

@@ -23,6 +23,8 @@ import { ModelCatalogue } from './catalogue'
 import { listChats } from './chats'
 import { readGitStatus } from './git'
 import { findInstalled } from './installed'
+import { TokenLedger } from './ledger'
+import { Meters, hasOwnStatusLine } from './meters'
 import { buildMenu } from './menu'
 import { PtyManager } from './pty'
 import { buildSessionEnv } from './shell'
@@ -70,9 +72,30 @@ let window: BrowserWindow | null = null
 let quitConfirmed = false
 let pageReports = false
 
+// Claude Code keeps its records in the home folder unless it is told another place.
+const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'), '.claude')
+const meters = new Meters({ directory: join(app.getPath('userData'), 'usage') })
+const ledger = new TokenLedger({ configDir: claudeConfigDir })
+// Read in the background: a week of records takes a moment the first time.
+let days: Awaited<ReturnType<TokenLedger['read']>> = []
+let readingDays: Promise<void> | null = null
+
+function readDays(): void {
+  readingDays ??= ledger
+    .read()
+    .then((read) => {
+      days = read
+    })
+    .catch(() => {})
+    .finally(() => {
+      readingDays = null
+    })
+}
+
 const sessions = new PtyManager(app.getVersion(), {
   onData: (sessionId, data) => send(IPC.sessionData, sessionId, data),
-  onExit: (sessionId, exitCode) => send(IPC.sessionExit, sessionId, exitCode)
+  onExit: (sessionId, exitCode) => send(IPC.sessionExit, sessionId, exitCode),
+  usageFileFor: (sessionId) => meters.fileFor(sessionId)
 })
 
 function send(channel: string, ...args: unknown[]): void {
@@ -133,11 +156,13 @@ function registerIpc(
     const project = projects.find((candidate) => candidate.id === projectId)
     const launcher = launchers.find((candidate) => candidate.id === launcherId)
     if (!project || launcher?.chats?.kind !== 'claude') return []
-    return listChats({
-      // Claude Code keeps its records in the home folder unless it is told another place.
-      configDir: process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'), '.claude'),
-      projectPath: project.path
-    })
+    return listChats({ configDir: claudeConfigDir, projectPath: project.path })
+  })
+
+  handle(IPC.readUsage, () => {
+    // What was read last, while the records are read again for the next time.
+    readDays()
+    return { ...meters.read(), days, reporting: !hasOwnStatusLine(claudeConfigDir) }
   })
 
   handle(IPC.addProject, async () => {
@@ -349,6 +374,8 @@ if (!app.requestSingleInstanceLock()) {
 
   bugLog.start()
   attachments.clearOld()
+  meters.clearOld()
+  readDays()
 
   void app.whenReady().then(() => {
     const store = new StateStore(join(app.getPath('userData'), 'state.json'), (error, backupPath) =>
