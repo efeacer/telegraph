@@ -153,7 +153,8 @@ describe('parseState', () => {
       modes: [{ id: 'restore', name: 'restore chat history', args: '--restore-chat-history' }],
       chats: { kind: 'claude', flag: '--resume' },
       reports: { kind: 'claude' },
-      modelCommand: '/model'
+      modelCommand: '/model',
+      renameCommand: '/rename'
     }
     expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([launcher])
   })

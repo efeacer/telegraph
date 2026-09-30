@@ -43,6 +43,11 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Renaming a chat
+
+Double-click the name of a session, or press ⇧⌘R, to rename it. Claude is
+told the new name too, so the chat keeps it when it is reopened later.
+
 ## Themes
 
 Night, Dark, Light and Creme, chosen at the foot of the sidebar or in

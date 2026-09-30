@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef } from 'react'
 import { STATUS_LABELS } from '@shared/status'
-import { activateSession, endSession, placeTerminal } from '../controller'
+import { activateSession, endSession, placeTerminal, startRenaming } from '../controller'
 import { sessionLabel, type SessionView } from '../store'
+import { NameField } from './NameField'
 import { Signal } from './Signal'
 
 interface TileProps {
@@ -14,10 +15,11 @@ interface TileProps {
   framed: boolean
   /** How many columns of the grid it takes. */
   span: number
+  renaming: boolean
 }
 
 /** The place of a session on the stage. Its terminal lives outside React, and is moved in and out. */
-export function Tile({ session, model, project, active, framed, span }: TileProps) {
+export function Tile({ session, model, project, active, framed, span, renaming }: TileProps) {
   const body = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -46,11 +48,21 @@ export function Tile({ session, model, project, active, framed, span }: TileProp
           className="tile-head"
           // A press on what cannot take the keys would take them from the terminal.
           onMouseDown={(event) => {
-            if (!(event.target as Element).closest('.tile-end')) event.preventDefault()
+            if (!(event.target as Element).closest('.tile-end, .name-field')) event.preventDefault()
           }}
         >
           <Signal status={session.status} />
-          <span className="tile-title">{label}</span>
+          {renaming ? (
+            <NameField sessionId={session.id} name={session.name ?? label} />
+          ) : (
+            <span
+              className="tile-title"
+              title="Double-click to rename"
+              onDoubleClick={() => startRenaming(session.id, 'tile')}
+            >
+              {label}
+            </span>
+          )}
           {model && <span className="tile-model">{model}</span>}
           <span className="tile-project">{project}</span>
           <span className="tile-status">{STATUS_LABELS[session.status]}</span>

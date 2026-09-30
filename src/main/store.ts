@@ -41,13 +41,15 @@ function isMode(value: unknown): value is Mode {
 /** The launcher with the parts of it that can be read, or nothing if it cannot start anything. */
 function readLauncher(value: unknown): Launcher[] {
   if (!isRecord(value)) return []
-  const { id, name, command, modelFlag, modelCommand, providers, models, modes, chats, reports } = value
+  const { id, name, command, modelFlag, modelCommand, renameCommand, providers, models, modes, chats, reports } =
+    value
   if (typeof id !== 'string' || typeof name !== 'string') return []
   if (command !== null && typeof command !== 'string') return []
 
   const launcher: Launcher = { id, name, command }
   if (typeof modelFlag === 'string') launcher.modelFlag = modelFlag
   if (typeof modelCommand === 'string') launcher.modelCommand = modelCommand
+  if (typeof renameCommand === 'string') launcher.renameCommand = renameCommand
   if (Array.isArray(providers)) {
     launcher.providers = providers.filter((provider) => typeof provider === 'string')
   }

@@ -10,6 +10,8 @@ export interface SessionView {
   launcherName: string
   /** The model the session was started on, unless the program chose it. */
   model: Model | null
+  /** The name the user gave the session, which comes before any other. */
+  name: string | null
   /** Title the running program has set for its terminal, if any. */
   title: string | null
   status: SessionStatus
@@ -54,6 +56,8 @@ export interface AppState {
   selectedProjectId: string | null
   /** One session at a time, or all of them side by side. */
   layout: Layout
+  /** The session whose name is being typed, and where: in the sidebar or in its tile. */
+  renaming: { sessionId: string; place: 'sidebar' | 'tile' } | null
   theme: ThemeName
   error: string | null
   reportingBug: boolean
@@ -71,6 +75,7 @@ let state: AppState = {
   activeSessionId: null,
   selectedProjectId: null,
   layout: lastLayout(),
+  renaming: null,
   theme: window.telegraph.theme,
   error: null,
   reportingBug: false
@@ -114,5 +119,5 @@ export function modelOf(current: AppState, session: SessionView): string | null 
 }
 
 export function sessionLabel(session: SessionView): string {
-  return session.title ?? session.launcherName
+  return session.name ?? session.title ?? session.launcherName
 }

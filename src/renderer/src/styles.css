@@ -1504,3 +1504,28 @@ button:focus-visible {
   right: -6px;
   min-width: 140px;
 }
+
+/* The name of a session, as it is typed in its place. */
+.name-field {
+  min-width: 0;
+  width: 100%;
+  padding: 1px 4px;
+  margin: -2px -5px;
+  border: 1px solid var(--glass);
+  border-radius: 4px;
+  font: inherit;
+  color: var(--paper);
+  background: var(--well);
+  user-select: text;
+  cursor: text;
+}
+
+.name-field:focus-visible {
+  outline: none;
+}
+
+.tile-head .name-field {
+  flex: 1;
+  font-size: var(--text-body);
+  margin: 0;
+}

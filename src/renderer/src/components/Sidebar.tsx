@@ -1,9 +1,17 @@
 import { STATUS_LABELS } from '@shared/status'
 import type { GitStatus, Launcher, Project } from '@shared/types'
 import { THEMES, type ThemeName } from '@shared/themes'
-import { activateSession, addProject, chooseTheme, endSession, selectProject } from '../controller'
+import {
+  activateSession,
+  addProject,
+  chooseTheme,
+  endSession,
+  selectProject,
+  startRenaming
+} from '../controller'
 import { describeGit } from '../format'
 import { modelOf, sessionLabel, type AppState, type SessionView } from '../store'
+import { NameField } from './NameField'
 import { ProjectMenu } from './ProjectMenu'
 import { Select } from './Select'
 import { Signal } from './Signal'
@@ -21,6 +29,7 @@ export function Sidebar({ state }: { state: AppState }) {
             git={state.git[project.id] ?? null}
             sessions={state.sessions.filter((session) => session.projectId === project.id)}
             modelOf={(session) => modelOf(state, session)}
+            renamingSessionId={state.renaming?.place === 'sidebar' ? state.renaming.sessionId : null}
             activeSessionId={state.activeSessionId}
             selected={state.selectedProjectId === project.id}
           />
@@ -51,10 +60,11 @@ interface ProjectGroupProps {
   activeSessionId: string | null
   selected: boolean
   modelOf(session: SessionView): string | null
+  renamingSessionId: string | null
 }
 
 function ProjectGroup(props: ProjectGroupProps) {
-  const { project, launchers, git, sessions, activeSessionId, selected, modelOf: model } = props
+  const { project, launchers, git, sessions, activeSessionId, selected, modelOf: model, renamingSessionId } = props
   const unread = sessions.filter((session) => session.unread).length
   return (
     <section className={selected ? 'project is-selected' : 'project'}>
@@ -85,6 +95,7 @@ function ProjectGroup(props: ProjectGroupProps) {
               session={session}
               model={model(session)}
               active={session.id === activeSessionId}
+              renaming={session.id === renamingSessionId}
             />
           ))}
         </ul>
@@ -97,9 +108,10 @@ interface SessionRowProps {
   session: SessionView
   model: string | null
   active: boolean
+  renaming: boolean
 }
 
-function SessionRow({ session, model, active }: SessionRowProps) {
+function SessionRow({ session, model, active, renaming }: SessionRowProps) {
   const label = sessionLabel(session)
   return (
     <li className={active ? 'session is-active' : 'session'} data-status={session.status}>
@@ -111,7 +123,17 @@ function SessionRow({ session, model, active }: SessionRowProps) {
       >
         <Signal status={session.status} />
         <span className="session-text">
-          <span className="session-title">{label}</span>
+          {renaming ? (
+            <NameField sessionId={session.id} name={session.name ?? label} />
+          ) : (
+            <span
+              className="session-title"
+              title="Double-click to rename"
+              onDoubleClick={() => startRenaming(session.id, 'sidebar')}
+            >
+              {label}
+            </span>
+          )}
           <span className="session-status">
             {STATUS_LABELS[session.status]}
             {model && <span className="session-model">{model}</span>}

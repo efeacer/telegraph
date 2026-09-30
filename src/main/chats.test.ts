@@ -81,6 +81,16 @@ describe('listChats', () => {
     expect((await list())[0]?.title).toBe('Add bug logging')
   })
 
+  it('calls a chat by the name the user gave it, before any title', async () => {
+    record(FIRST, [said('start'), titled('Add bug logging'), { type: 'custom-title', customTitle: 'Logging, round two' }, titled('Add bug logging again')])
+    expect((await list())[0]?.title).toBe('Logging, round two')
+  })
+
+  it('calls a chat by the name it was given last', async () => {
+    record(FIRST, [said('start'), { type: 'custom-title', customTitle: 'First name' }, { type: 'custom-title', customTitle: 'Second name' }])
+    expect((await list())[0]?.title).toBe('Second name')
+  })
+
   it('calls a chat by the title it was given last', async () => {
     const long = Array.from({ length: 4000 }, (_, index) => answered(`line ${index} ${'x'.repeat(200)}`))
     record(FIRST, [said('start'), titled('Add bug logging'), ...long, titled('Add bug logging and a model picker'), answered('Done.')])

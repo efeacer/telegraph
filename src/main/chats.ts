@@ -70,7 +70,10 @@ async function readTitle(path: string, projectPath: string): Promise<string | nu
     if (hadElsewhere && hadElsewhere.cwd !== projectPath) return null
     if (head.some((line) => line.type === 'user' && line.isSidechain === true)) return null
 
-    const given = tidy([...head, ...tail].findLast((line) => line.type === 'ai-title')?.aiTitle)
+    const lines = [...head, ...tail]
+    // A name the user gave the chat comes before one Claude made up for it.
+    const named = tidy(lines.findLast((line) => line.type === 'custom-title')?.customTitle)
+    const given = named ?? tidy(lines.findLast((line) => line.type === 'ai-title')?.aiTitle)
 
     // Programs have chats too, to make summaries and the like, which nobody wants to go on with.
     // Records say where a chat was started. Those from before they did have a title if a person was in it.

@@ -98,6 +98,11 @@ export function Stage({ state }: { state: AppState }) {
                 active={shownSession.id === state.activeSessionId}
                 framed={sideBySide}
                 span={spans[index] ?? 1}
+                renaming={
+                  sideBySide &&
+                  state.renaming?.place === 'tile' &&
+                  state.renaming.sessionId === shownSession.id
+                }
               />
             ))}
           </div>

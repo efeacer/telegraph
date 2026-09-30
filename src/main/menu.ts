@@ -55,6 +55,12 @@ export function buildMenu(options: MenuOptions): Menu {
           click: () => send({ type: 'clear' })
         },
         {
+          id: 'rename-session',
+          label: 'Rename Session…',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: () => send({ type: 'rename-session' })
+        },
+        {
           label: 'End Session',
           accelerator: 'CmdOrCtrl+W',
           click: () => send({ type: 'close-session' })

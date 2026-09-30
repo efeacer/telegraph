@@ -110,6 +110,8 @@ export interface Launcher {
   modelFlag?: string
   /** Typed into a running session, followed by a model, to change to that model. */
   modelCommand?: string
+  /** Typed into a running session, followed by a name, to rename the chat. */
+  renameCommand?: string
   /** The providers in the catalogue whose models the program runs. */
   providers?: string[]
   /** Models offered first, and the only ones offered without the catalogue. */
@@ -173,6 +175,7 @@ export type MenuCommand =
   | { type: 'add-project' }
   | { type: 'report-bug' }
   | { type: 'toggle-layout' }
+  | { type: 'rename-session' }
 
 export interface TelegraphApi {
   /** True when the app runs under the end-to-end tests. */

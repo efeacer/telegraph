@@ -1,9 +1,16 @@
 import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
 import { describeNotice, noticeFor, type NoticeKind } from '@shared/notices'
+import { tidyName } from '@shared/names'
 import { escapePath } from '@shared/paths'
 import type { ThemeName } from '@shared/themes'
-import { initialStatus, reduceStatus, type StatusEvent, type StatusState } from '@shared/status'
+import {
+  QUIET_MS,
+  initialStatus,
+  reduceStatus,
+  type StatusEvent,
+  type StatusState
+} from '@shared/status'
 import type { Chat, Choice, Launcher, MenuCommand, Model, Start } from '@shared/types'
 import { report } from './problems'
 import {
@@ -30,6 +37,8 @@ const terminals = new TerminalManager({ useGpu: !api.e2e, theme: api.theme })
 const statuses = new Map<string, StatusState>()
 /** Sessions into which something has been typed and not yet sent. */
 const drafting = new Set<string>()
+/** Names to tell the agents of, once they can be typed to. */
+const pendingNames = new Map<string, string>()
 
 // From the start: the theme can be chosen in the menu before the window has drawn anything.
 api.onThemeChanged(showTheme)
@@ -223,6 +232,7 @@ export async function startSession(
     projectId,
     launcherId: launcher.id,
     launcherName: launcher.name,
+    name: null,
     model,
     title: null,
     status: 'idle',
@@ -324,6 +334,48 @@ export function switchModel(sessionId: string, modelId: string): void {
   terminals.focus(sessionId)
 }
 
+/** Opens the name of a session to be typed, where it was asked for: by default in its tile, when there are tiles. */
+export function startRenaming(sessionId: string | null, place?: 'sidebar' | 'tile'): void {
+  if (!sessionId || !getState().sessions.some((session) => session.id === sessionId)) return
+  const where = place ?? (getState().layout === 'grid' ? 'tile' : 'sidebar')
+  setState((state) => ({ ...state, renaming: { sessionId, place: where } }))
+}
+
+/** Ends the typing of a name: with the text typed, or with null when it was given up. */
+export function finishRenaming(sessionId: string, text: string | null): void {
+  setState((state) => (state.renaming?.sessionId === sessionId ? { ...state, renaming: null } : state))
+  focusActive()
+  if (text === null) return
+  const session = getState().sessions.find((candidate) => candidate.id === sessionId)
+  if (!session) return
+  const name = tidyName(text)
+  if (name === session.name) return
+  updateSession(sessionId, { name })
+  // The agent keeps the name in its own record of the chat, and so it outlives the session.
+  const launcher = getState().launchers.find((candidate) => candidate.id === session.launcherId)
+  if (name && launcher?.renameCommand) {
+    pendingNames.set(sessionId, name)
+    tellName(sessionId, performance.now())
+  }
+}
+
+/**
+ * Types the name into the session, once that cannot go wrong: not while the
+ * agent works or has just been sent something, nor while something is typed.
+ */
+function tellName(sessionId: string, at: number): void {
+  const name = pendingNames.get(sessionId)
+  const status = statuses.get(sessionId)
+  const session = getState().sessions.find((candidate) => candidate.id === sessionId)
+  const launcher = getState().launchers.find((candidate) => candidate.id === session?.launcherId)
+  if (!name || !status || !session || !launcher?.renameCommand) return pendingNames.delete(sessionId), undefined
+  if (status.status === 'exited') return pendingNames.delete(sessionId), undefined
+  const settled = at - status.lastInputAt > QUIET_MS && status.burstStartedAt === null
+  if (status.status === 'working' || !settled || drafting.has(sessionId)) return
+  pendingNames.delete(sessionId)
+  api.write(sessionId, `${launcher.renameCommand} ${name}\r`)
+}
+
 function remember(projectId: string, launcherId: string, modelId: string | null): void {
   const models = { ...getState().choices[projectId]?.models }
   // A name that could not be a model's is not kept, and the one chosen before stays.
@@ -408,6 +460,7 @@ function discardSession(sessionId: string): void {
   terminals.dispose(sessionId)
   statuses.delete(sessionId)
   drafting.delete(sessionId)
+  pendingNames.delete(sessionId)
   setState((state) => ({
     ...state,
     sessions: state.sessions.filter((session) => session.id !== sessionId),
@@ -496,6 +549,7 @@ function tick(): void {
   for (const sessionId of statuses.keys()) {
     track(sessionId, { type: 'tick', at, focused: isWatched(sessionId) })
   }
+  for (const sessionId of pendingNames.keys()) tellName(sessionId, at)
 }
 
 export async function refreshUsage(): Promise<void> {
@@ -561,6 +615,9 @@ function handleMenuCommand(command: MenuCommand): void {
       break
     case 'toggle-layout':
       toggleLayout()
+      break
+    case 'rename-session':
+      startRenaming(activeSessionId)
       break
   }
 }
