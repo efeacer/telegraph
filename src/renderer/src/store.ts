@@ -66,6 +66,8 @@ export interface AppState {
   /** The meetings of the user, as far as Telegraph knows them. Null until it was read. */
   agenda: AgendaState | null
   google: GoogleStatus
+  /** Whether the companion lives in this window. It lives in one window only. */
+  companionHost: boolean
   connectionsOpen: boolean
   sessions: SessionView[]
   activeSessionId: string | null
@@ -89,6 +91,7 @@ let state: AppState = {
   usage: null,
   agenda: null,
   google: { state: 'unconfigured' },
+  companionHost: false,
   connectionsOpen: false,
   sessions: [],
   activeSessionId: null,

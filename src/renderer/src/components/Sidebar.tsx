@@ -24,7 +24,9 @@ export function Sidebar({ state }: { state: AppState }) {
     <aside className="sidebar" aria-label="Projects">
       <div className="titlebar-space" />
       <div className="sidebar-scroll">
-        {state.projects.map((project) => (
+        {state.projects
+          .filter((project) => !project.companion || state.companionHost)
+          .map((project) => (
           <ProjectGroup
             key={project.id}
             project={project}

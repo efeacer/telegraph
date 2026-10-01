@@ -96,6 +96,11 @@ export async function initialize(): Promise<void> {
   api.onOpenSession(activateSession)
   api.onAgendaChanged((agenda) => setState((state) => ({ ...state, agenda })))
   api.onGoogleChanged((google) => setState((state) => ({ ...state, google })))
+  api.onStateChanged(() => void reloadProjects())
+  api.onCompanionHostChanged((companionHost) => {
+    setState((state) => ({ ...state, companionHost }))
+    if (companionHost) void startCompanion()
+  })
   void api.googleStatus().then((google) => setState((state) => ({ ...state, google })))
 
   const persisted = await api.loadState()
@@ -122,7 +127,10 @@ export async function initialize(): Promise<void> {
     .then((agenda) => setState((state) => ({ ...state, agenda: state.agenda ?? agenda })))
     .catch(() => {})
   markReady()
-  void startCompanion()
+  const companionHost = await api.isCompanionHost().catch(() => false)
+  setState((state) => ({ ...state, companionHost }))
+  // The companion lives in one window: the first opened.
+  if (companionHost) void startCompanion()
   if (installed === null) {
     void detection.then((ids) =>
       setState((state) => ({ ...state, launchers: state.launchers.filter(offer(ids)) }))
@@ -147,6 +155,21 @@ export async function initialize(): Promise<void> {
   setInterval(() => void refreshUsage(), USAGE_REFRESH_INTERVAL_MS)
   void refreshGit()
   void refreshUsage()
+}
+
+/** Takes the projects as another window left them. */
+async function reloadProjects(): Promise<void> {
+  const persisted = await api.loadState()
+  setState((state) => {
+    const projects = persisted.projects
+    const kept = projects.some((project) => project.id === state.selectedProjectId)
+    return {
+      ...state,
+      projects,
+      selectedProjectId: kept ? state.selectedProjectId : (projects.find((project) => !project.companion)?.id ?? null)
+    }
+  })
+  void refreshGit()
 }
 
 export async function addProject(): Promise<string | null> {

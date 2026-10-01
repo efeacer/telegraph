@@ -89,10 +89,36 @@ const attachments = new Attachments({
   directory: join(app.getPath('temp'), 'telegraph-attachments')
 })
 
-let window: BrowserWindow | null = null
+// Every window of Telegraph. Each has sessions of its own; projects, the theme and the accounts are shared.
+const windows = new Set<BrowserWindow>()
+/** The window the companion lives in: the first opened of those still open. */
+let host: BrowserWindow | null = null
+/** The window last in front, which the menu and the notices go to when none is. */
+let lastFocused: BrowserWindow | null = null
+/** Each session, by the window it belongs to. */
+const owners = new Map<string, number>()
+/** What each window counts as new, which the icon of the app adds up. */
+const unreadCounts = new Map<number, number>()
+/** The windows whose page reports its own errors. */
+const reportingPages = new Set<number>()
+
+function frontWindow(): BrowserWindow | null {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (focused && windows.has(focused)) return focused
+  if (lastFocused && windows.has(lastFocused)) return lastFocused
+  return host ?? [...windows][0] ?? null
+}
+
+function windowOf(sessionId: string): BrowserWindow | null {
+  const owner = owners.get(sessionId)
+  return [...windows].find((candidate) => candidate.webContents.id === owner) ?? null
+}
+
+function sessionsOf(target: BrowserWindow): string[] {
+  return [...owners].filter(([, owner]) => owner === target.webContents.id).map(([sessionId]) => sessionId)
+}
 let theme: ThemeName = DEFAULT_THEME
 let quitConfirmed = false
-let pageReports = false
 
 // Claude Code keeps its records in the home folder unless it is told another place.
 const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR || join(app.getPath('home'), '.claude')
@@ -112,7 +138,8 @@ const systemNotices: NotifierTools = {
   create: (options) => {
     const notification = new Notification(options)
     // A window that is not in front can ask for a look, where the system has a way to.
-    if (process.platform !== 'darwin' && window && !window.isFocused()) window.flashFrame(true)
+    const asking = frontWindow()
+    if (process.platform !== 'darwin' && asking && !asking.isFocused()) asking.flashFrame(true)
     return {
       show: () => notification.show(),
       close: () => notification.close(),
@@ -122,9 +149,9 @@ const systemNotices: NotifierTools = {
   setBadge: (count) => {
     if (process.platform !== 'win32') {
       app.setBadgeCount(count)
-    } else if (window && !window.isDestroyed()) {
+    } else {
       const mark = count > 0 ? nativeImage.createFromDataURL(WAITING_MARK) : null
-      window.setOverlayIcon(mark, count > 0 ? `${count} waiting` : '')
+      for (const each of windows) each.setOverlayIcon(mark, count > 0 ? `${count} waiting` : '')
     }
   }
 }
@@ -152,16 +179,17 @@ function recordedNotices(): NotifierTools {
 }
 
 const notifier = new Notifier(isE2E ? recordedNotices() : systemNotices, (sessionId) => {
-  bringForward()
-  send(IPC.openSession, sessionId)
+  const owner = windowOf(sessionId)
+  bringForward(owner)
+  if (owner) owner.webContents.send(IPC.openSession, sessionId)
 })
 
-/** Brings the window to the front, which under test would take the keys from the user. */
-function bringForward(): void {
-  if (!window || isE2E) return
-  if (window.isMinimized()) window.restore()
-  window.show()
-  window.focus()
+/** Brings a window to the front, which under test would take the keys from the user. */
+function bringForward(target: BrowserWindow | null = frontWindow()): void {
+  if (!target || isE2E) return
+  if (target.isMinimized()) target.restore()
+  target.show()
+  target.focus()
 }
 
 // The companion: a chat of its own in a folder of its own, told of the day.
@@ -314,18 +342,18 @@ function offerHelp(meeting: Meeting): void {
       body: `At ${clock}. Want help preparing? Press to ask your companion.`
     },
     () => {
-      bringForward()
+      bringForward(host)
       askWhenLoaded(nudgePrompt(meeting, `at ${clock}`))
     }
   )
 }
 
-// What the companion is to be asked, held while the page is loading and cannot hear it.
-let pageLoaded = false
+// What the companion is to be asked, held while the page it lives in is loading and cannot hear it.
+const loadedPages = new Set<number>()
 const heldAsks: string[] = []
 
 function askWhenLoaded(prompt: string): void {
-  if (pageLoaded) send(IPC.askCompanion, prompt)
+  if (host && loadedPages.has(host.webContents.id)) host.webContents.send(IPC.askCompanion, prompt)
   else heldAsks.push(prompt)
 }
 
@@ -357,21 +385,33 @@ function readDays(): ReturnType<TokenLedger['read']> {
 }
 
 const sessions = new PtyManager(app.getVersion(), {
-  onData: (sessionId, data) => send(IPC.sessionData, sessionId, data),
+  onData: (sessionId, data) => windowOf(sessionId)?.webContents.send(IPC.sessionData, sessionId, data),
   onExit: (sessionId, exitCode) => {
     meters.retire(sessionId)
-    send(IPC.sessionExit, sessionId, exitCode)
+    // Still its window's after it ends, until the window lets go of it, to take back what was told of it.
+    windowOf(sessionId)?.webContents.send(IPC.sessionExit, sessionId, exitCode)
   },
   usageFileFor: (sessionId) => meters.fileFor(sessionId),
   extraEnv: () => sessionExtras()
 })
 
+/** Tells every window. */
 function send(channel: string, ...args: unknown[]): void {
-  if (window && !window.isDestroyed()) window.webContents.send(channel, ...args)
+  for (const each of windows) if (!each.isDestroyed()) each.webContents.send(channel, ...args)
 }
 
 function sendMenuCommand(command: MenuCommand): void {
-  send(IPC.menuCommand, command)
+  frontWindow()?.webContents.send(IPC.menuCommand, command)
+}
+
+/** Whether a window may act on a session: only on its own. */
+function owns(event: IpcMainEvent | IpcMainInvokeEvent, sessionId: unknown): sessionId is string {
+  return typeof sessionId === 'string' && owners.get(sessionId) === event.sender.id
+}
+
+/** Tells the windows that the projects have changed, all but the one that changed them. */
+function tellOthers(event: IpcMainInvokeEvent): void {
+  for (const each of windows) if (each.webContents.id !== event.sender.id) each.webContents.send(IPC.stateChanged)
 }
 
 /** Only the app's own page may talk to the main process. */
@@ -386,10 +426,18 @@ function handle<Args extends unknown[], Result>(
   channel: string,
   handler: (...args: Args) => Result | Promise<Result>
 ): void {
+  handleFrom<Args, Result>(channel, (_event, ...args) => handler(...args))
+}
+
+/** As handle, for what needs to know which window asked. */
+function handleFrom<Args extends unknown[], Result>(
+  channel: string,
+  handler: (event: IpcMainInvokeEvent, ...args: Args) => Result | Promise<Result>
+): void {
   ipcMain.handle(channel, async (event, ...args) => {
     try {
       if (!isTrusted(event)) throw new Error(`Rejected ${channel} from an unknown page`)
-      return await handler(...(args as Args))
+      return await handler(event, ...(args as Args))
     } catch (error) {
       bugLog.record({ kind: 'ipc-error', ...describeProblem(error), detail: { channel } })
       throw error
@@ -398,8 +446,13 @@ function handle<Args extends unknown[], Result>(
 }
 
 function listen<Args extends unknown[]>(channel: string, handler: (...args: Args) => void): void {
+  listenFrom<Args>(channel, (_event, ...args) => handler(...args))
+}
+
+/** As listen, for what needs to know which window sent it. */
+function listenFrom<Args extends unknown[]>(channel: string, handler: (event: IpcMainEvent, ...args: Args) => void): void {
   ipcMain.on(channel, (event, ...args) => {
-    if (isTrusted(event)) handler(...(args as Args))
+    if (isTrusted(event)) handler(event, ...(args as Args))
   })
 }
 
@@ -455,12 +508,13 @@ function registerIpc(
     return google.status()
   })
 
-  handle(IPC.importGoogleClient, async () => {
+  handleFrom(IPC.importGoogleClient, async (event) => {
     const status = (): GoogleStatus => google?.status() ?? { state: 'unconfigured' }
     // Under test the file is named by the test, and no dialog is opened on the user's desktop.
     let path = isE2E ? process.env.TELEGRAPH_TEST_IMPORT_FILE : undefined
-    if (!isE2E && window) {
-      const chosen = await dialog.showOpenDialog(window, {
+    const asking = BrowserWindow.fromWebContents(event.sender)
+    if (!isE2E && asking) {
+      const chosen = await dialog.showOpenDialog(asking, {
         title: 'Choose the file Google gave',
         buttonLabel: 'Use this file',
         defaultPath: app.getPath('downloads'),
@@ -497,7 +551,12 @@ function registerIpc(
 
   listen(IPC.withdrawNotice, (sessionId: unknown) => notifier.withdraw(sessionId))
 
-  listen(IPC.setBadge, (count: unknown) => notifier.badge(count))
+  // Each window counts its own; the icon shows them all.
+  listenFrom(IPC.setBadge, (event, count: unknown) => {
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return
+    unreadCounts.set(event.sender.id, count)
+    updateBadge()
+  })
 
   ipcMain.on(IPC.theme, (event) => {
     event.returnValue = isTrusted(event) ? store.get().theme : DEFAULT_THEME
@@ -511,19 +570,25 @@ function registerIpc(
     reporting: !hasOwnStatusLine(claudeConfigDir)
   }))
 
-  handle(IPC.addProject, async () => {
-    if (!window) return null
-    const result = await dialog.showOpenDialog(window, {
+  handleFrom(IPC.addProject, async (event) => {
+    const asking = BrowserWindow.fromWebContents(event.sender)
+    if (!asking) return null
+    const result = await dialog.showOpenDialog(asking, {
       title: 'Add project',
       buttonLabel: 'Add project',
       properties: ['openDirectory', 'createDirectory']
     })
     const folder = result.filePaths[0]
     if (result.canceled || !folder) return null
-    return store.addProject(folder)
+    const project = store.addProject(folder)
+    tellOthers(event)
+    return project
   })
 
-  handle(IPC.removeProject, (projectId: string) => store.removeProject(projectId))
+  handleFrom(IPC.removeProject, (event, projectId: string) => {
+    store.removeProject(projectId)
+    tellOthers(event)
+  })
 
   // Found by the project: the window names a project, never a path to open.
   listen(IPC.openFolder, (projectId: unknown) => {
@@ -540,20 +605,25 @@ function registerIpc(
 
   handle(IPC.gitStatus, (projectPath: string) => readGitStatus(projectPath))
 
-  handle(IPC.createSession, (request: CreateSessionRequest): CreateSessionResult => {
+  handleFrom(IPC.createSession, (event, request: CreateSessionRequest): CreateSessionResult => {
     try {
+      // Before it is started: what it prints first goes to the window it belongs to.
+      owners.set(request.sessionId, event.sender.id)
       sessions.create({ ...request, command: commandFor(request) })
       return { ok: true }
     } catch (error) {
+      owners.delete(request.sessionId)
       bugLog.record({ kind: 'session-failure', ...describeProblem(error) })
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 
-  handle(IPC.closeSession, async (sessionId: string) => {
+  handleFrom(IPC.closeSession, async (event, sessionId: unknown) => {
+    if (!owns(event, sessionId)) return false
     const running = sessions.foregroundProcess(sessionId)
-    if (running !== null && window && !isE2E) {
-      const { response } = await dialog.showMessageBox(window, {
+    const asking = BrowserWindow.fromWebContents(event.sender)
+    if (running !== null && asking && !isE2E) {
+      const { response } = await dialog.showMessageBox(asking, {
         type: 'warning',
         message: 'End this session?',
         detail: `${running} is still running. Ending the session stops it.`,
@@ -567,15 +637,20 @@ function registerIpc(
     return true
   })
 
-  handle(IPC.pauseSession, (sessionId: unknown) => typeof sessionId === 'string' && sessions.pause(sessionId))
+  // A window acts on its own sessions only.
+  handleFrom(IPC.pauseSession, (event, sessionId: unknown) => owns(event, sessionId) && sessions.pause(sessionId))
 
-  handle(IPC.resumeSession, (sessionId: unknown) => typeof sessionId === 'string' && sessions.resume(sessionId))
+  handleFrom(IPC.resumeSession, (event, sessionId: unknown) => owns(event, sessionId) && sessions.resume(sessionId))
 
-  listen(IPC.write, (sessionId: string, data: string) => sessions.write(sessionId, data))
+  listenFrom(IPC.write, (event, sessionId: unknown, data: string) => {
+    if (owns(event, sessionId)) sessions.write(sessionId, data)
+  })
 
-  listen(IPC.resize, (sessionId: string, cols: number, rows: number) =>
-    sessions.resize(sessionId, cols, rows)
-  )
+  listenFrom(IPC.resize, (event, sessionId: unknown, cols: number, rows: number) => {
+    if (owns(event, sessionId)) sessions.resize(sessionId, cols, rows)
+  })
+
+  handleFrom(IPC.isCompanionHost, (event) => host?.webContents.id === event.sender.id)
 
   listen(IPC.openExternal, (url: string) => openInBrowser(url))
 
@@ -586,8 +661,8 @@ function registerIpc(
     return checked !== null && bugLog.record(checked) !== null
   })
 
-  listen(IPC.reporting, () => {
-    pageReports = true
+  listenFrom(IPC.reporting, (event) => {
+    reportingPages.add(event.sender.id)
   })
 }
 
@@ -597,7 +672,7 @@ function applyTheme(store: StateStore, chosen: unknown): void {
   if (!found) return
   store.saveTheme(found.name)
   theme = found.name
-  if (window && !window.isDestroyed()) window.setBackgroundColor(found.background)
+  for (const each of windows) if (!each.isDestroyed()) each.setBackgroundColor(found.background)
   const item = Menu.getApplicationMenu()?.getMenuItemById(`theme-${found.name}`)
   if (item) item.checked = true
   send(IPC.themeChanged, found.name)
@@ -660,27 +735,56 @@ function openInBrowser(url: string): void {
   }
 }
 
-function confirmQuit(target: BrowserWindow): boolean {
-  const busy = sessions.busySessionCount()
+/** Asks before stopping sessions that are busy. True when the user said yes, or nothing is busy. */
+function confirmStopping(target: BrowserWindow, sessionIds: Iterable<string>, closing: 'quit' | 'window'): boolean {
+  const busy = sessions.busySessionCount(sessionIds)
   if (busy === 0 || isE2E) return true
+  const what = closing === 'quit' ? 'Quitting' : 'Closing the window'
   const response = dialog.showMessageBoxSync(target, {
     type: 'warning',
-    message: 'Quit Telegraph?',
+    message: closing === 'quit' ? 'Quit Telegraph?' : 'Close this window?',
     detail:
       busy === 1
-        ? 'One session is still running. Quitting stops it.'
-        : `${busy} sessions are still running. Quitting stops them.`,
-    buttons: ['Quit', 'Cancel'],
+        ? `One session is still running. ${what} stops it.`
+        : `${busy} sessions are still running. ${what} stops them.`,
+    buttons: [closing === 'quit' ? 'Quit' : 'Close', 'Cancel'],
     defaultId: 1,
     cancelId: 1
   })
   return response === 0
 }
 
+function updateBadge(): void {
+  notifier.badge([...unreadCounts.values()].reduce((sum, count) => sum + count, 0))
+}
+
+/** Ends the sessions of a window, which it has closed or lost track of, and forgets what it told of them. */
+function forgetSessionsOf(target: BrowserWindow): void {
+  for (const sessionId of sessionsOf(target)) {
+    sessions.kill(sessionId)
+    notifier.withdraw(sessionId)
+    owners.delete(sessionId)
+  }
+  unreadCounts.delete(target.webContents.id)
+  updateBadge()
+}
+
+/** Gives the companion a window to live in: the first opened of those still open. */
+function chooseHost(): void {
+  if (host && windows.has(host)) return
+  host = [...windows][0] ?? null
+  if (!host) return
+  host.webContents.send(IPC.companionHostChanged, true)
+  if (loadedPages.has(host.webContents.id)) for (const prompt of heldAsks.splice(0)) host.webContents.send(IPC.askCompanion, prompt)
+}
+
+/** Opens a window of Telegraph, a little below and to the right of the one in front. */
 function createWindow(): void {
-  window = new BrowserWindow({
-    width: 1320,
-    height: 860,
+  const before = frontWindow()?.getBounds()
+  const created = new BrowserWindow({
+    width: before?.width ?? 1320,
+    height: before?.height ?? 860,
+    ...(before ? { x: before.x + 28, y: before.y + 28 } : {}),
     minWidth: 760,
     minHeight: 440,
     show: false,
@@ -697,10 +801,13 @@ function createWindow(): void {
       additionalArguments: isE2E ? [E2E_ARGUMENT] : []
     }
   })
-  const created = window
+  const contentsId = created.webContents.id
+  windows.add(created)
+  host ??= created
+  lastFocused = created
 
   watchWindow(bugLog, created, {
-    pageReports: () => pageReports,
+    pageReports: () => reportingPages.has(contentsId),
     onCrash: () => void offerReload(created)
   })
 
@@ -708,37 +815,49 @@ function createWindow(): void {
 
   created.on('close', (event) => {
     if (quitConfirmed) return
-    if (confirmQuit(created)) {
-      quitConfirmed = true
-    } else {
-      event.preventDefault()
-    }
+    if (!confirmStopping(created, sessionsOf(created), 'window')) event.preventDefault()
   })
 
   created.on('closed', () => {
-    window = null
+    windows.delete(created)
+    reportingPages.delete(contentsId)
+    loadedPages.delete(contentsId)
+    for (const sessionId of [...owners].filter(([, owner]) => owner === contentsId).map(([id]) => id)) {
+      sessions.kill(sessionId)
+      notifier.withdraw(sessionId)
+      owners.delete(sessionId)
+    }
+    unreadCounts.delete(contentsId)
+    updateBadge()
+    if (lastFocused === created) lastFocused = null
+    if (host === created) {
+      host = null
+      chooseHost()
+    }
   })
 
-  // Asked for a look by a notice, and looked at now.
-  created.on('focus', () => created.flashFrame(false))
+  created.on('focus', () => {
+    lastFocused = created
+    // Asked for a look by a notice, and looked at now.
+    created.flashFrame(false)
+  })
 
   // A reloaded page has lost track of its sessions, so they cannot be
   // reached any more and would keep running unseen.
   created.webContents.on('did-start-navigation', (details) => {
     if (!details.isMainFrame || details.isSameDocument) return
-    sessions.killAll()
-    pageLoaded = false
-    notifier.clear()
-    pageReports = false
+    forgetSessionsOf(created)
+    loadedPages.delete(contentsId)
+    reportingPages.delete(contentsId)
   })
 
-  // The page that is going can still tell of its sessions ending, after it was cleared up behind.
   created.webContents.on('did-finish-load', () => {
-    pageLoaded = true
-    for (const prompt of heldAsks.splice(0)) send(IPC.askCompanion, prompt)
-    notifier.clear()
+    loadedPages.add(contentsId)
+    // The page that went can still have told of its sessions ending, after it was cleared up behind.
+    forgetSessionsOf(created)
+    if (host === created) for (const prompt of heldAsks.splice(0)) created.webContents.send(IPC.askCompanion, prompt)
     // A theme chosen while the page was loading was told of before it could hear it.
-    send(IPC.themeChanged, theme)
+    created.webContents.send(IPC.themeChanged, theme)
   })
 
   created.webContents.setWindowOpenHandler(({ url }) => {
@@ -762,13 +881,23 @@ function createWindow(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // Started again, from the Dock, Finder or a terminal: another window, as a terminal opens one.
   app.on('second-instance', () => {
-    if (!window) return
-    if (window.isMinimized()) window.restore()
-    window.focus()
+    if (app.isReady()) createWindow()
   })
 
   app.on('window-all-closed', () => app.quit())
+
+  // Quitting asks once for all windows, and then closes them without asking again.
+  app.on('before-quit', (event) => {
+    if (quitConfirmed) return
+    const asking = frontWindow()
+    if (asking && !confirmStopping(asking, owners.keys(), 'quit')) {
+      event.preventDefault()
+      return
+    }
+    quitConfirmed = true
+  })
   app.on('will-quit', () => {
     void bridge?.close()
     sessions.killAll()
@@ -826,11 +955,13 @@ if (!app.requestSingleInstanceLock()) {
           send: sendMenuCommand,
           showBugLog,
           theme,
-          setTheme: (chosen) => applyTheme(store, chosen)
+          setTheme: (chosen) => applyTheme(store, chosen),
+          newWindow: createWindow
         })
       )
     setMenu(launchers)
     void installed.then((ids) => setMenu(launchers.filter((launcher) => ids.includes(launcher.id))))
+    app.dock?.setMenu(Menu.buildFromTemplate([{ label: 'New Window', click: createWindow }]))
     createWindow()
   })
 }

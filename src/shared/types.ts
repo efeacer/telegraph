@@ -226,6 +226,11 @@ export interface TelegraphApi {
   removeProject(projectId: string): Promise<void>
   /** Opens the folder of a project in Finder, File Explorer or the file manager of the system. */
   openFolder(projectId: string): void
+  /** Called when another window has changed the projects. */
+  onStateChanged(listener: () => void): () => void
+  /** Whether the companion lives in this window: the first window opened that is still open. */
+  isCompanionHost(): Promise<boolean>
+  onCompanionHostChanged(listener: (host: boolean) => void): () => void
   /** The ids of the launchers whose program is installed. */
   installedLaunchers(): Promise<string[]>
   /** The models of each provider. Empty when the list could not be had. */

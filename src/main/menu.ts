@@ -17,10 +17,11 @@ export interface MenuOptions {
   showBugLog(): void
   theme: ThemeName
   setTheme(theme: ThemeName): void
+  newWindow(): void
 }
 
 export function buildMenu(options: MenuOptions): Menu {
-  const { launchers, includeDeveloperTools, send, showBugLog, theme, setTheme } = options
+  const { launchers, includeDeveloperTools, send, showBugLog, theme, setTheme, newWindow } = options
   const startItems: MenuItemConstructorOptions[] = launchers.map((launcher) => ({
     label: `Start ${launcher.name}`,
     accelerator: LAUNCHER_SHORTCUTS[launcher.id],
@@ -41,6 +42,8 @@ export function buildMenu(options: MenuOptions): Menu {
     {
       label: 'Session',
       submenu: [
+        { id: 'new-window', label: 'New Window', accelerator: 'CmdOrCtrl+Shift+N', click: newWindow },
+        { type: 'separator' },
         ...startItems,
         { type: 'separator' },
         {

@@ -123,9 +123,10 @@ export class PtyManager {
     return name === shellName(session.shell) ? null : name
   }
 
-  busySessionCount(): number {
+  /** How many of the sessions, all of them unless they are named, have a program running in front of the shell. */
+  busySessionCount(sessionIds: Iterable<string> = this.sessions.keys()): number {
     let count = 0
-    for (const sessionId of this.sessions.keys()) {
+    for (const sessionId of sessionIds) {
       if (this.foregroundProcess(sessionId) !== null) count++
     }
     return count

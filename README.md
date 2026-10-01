@@ -43,6 +43,12 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Several windows
+
+Session > New Window (⇧⌘N) opens another window, as does the Dock icon's menu
+or starting Telegraph again. Each window has its own sessions; projects, the
+theme and Google are shared. The companion lives in the first window.
+
 ## Opening a project's folder
 
 The folder icon beside a project opens its folder in Finder (File Explorer on
