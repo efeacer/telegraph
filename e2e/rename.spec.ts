@@ -141,3 +141,23 @@ test('renames from the sidebar while the sessions are side by side', async () =>
   await expect(page.locator('.tile-title')).toHaveText('From the sidebar')
   await expect(terminal()).toContainText('renamed to From the sidebar')
 })
+
+test('takes a name typed with spaces, key by key, in the sidebar and in a tile', async () => {
+  await startNamer()
+  await row().locator('.session-title').dblclick()
+  const field = page.getByRole('textbox', { name: 'Name of the session' })
+  await expect(field).toBeFocused()
+  await page.keyboard.press('Meta+a')
+  await page.keyboard.type('Fix the seat picker')
+  await expect(field).toBeFocused()
+  await expect(field).toHaveValue('Fix the seat picker')
+  await page.keyboard.press('Enter')
+  await expect(row().locator('.session-title')).toHaveText('Fix the seat picker')
+
+  await page.getByRole('button', { name: 'Show sessions side by side' }).click()
+  await page.locator('.tile-title').dblclick()
+  await page.keyboard.press('Meta+a')
+  await page.keyboard.type('A name with spaces')
+  await page.keyboard.press('Enter')
+  await expect(row().locator('.session-title')).toHaveText('A name with spaces')
+})

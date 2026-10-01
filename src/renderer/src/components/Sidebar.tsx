@@ -166,6 +166,7 @@ interface SessionRowProps {
 }
 
 function SessionRow({ session, model, active, renaming }: SessionRowProps) {
+  const Main = renaming ? 'div' : 'button'
   const label = sessionLabel(session)
   return (
     <li
@@ -173,11 +174,12 @@ function SessionRow({ session, model, active, renaming }: SessionRowProps) {
       data-status={session.status}
       data-paused={session.paused || undefined}
     >
-      <button
-        type="button"
+      {/* While its name is typed the row is no button: a button takes Space for a press, and the name would end at the first word. */}
+      <Main
         className="session-main"
-        aria-current={active ? 'true' : undefined}
-        onClick={() => activateSession(session.id)}
+        {...(renaming
+          ? {}
+          : { type: 'button', 'aria-current': active ? 'true' : undefined, onClick: () => activateSession(session.id) })}
       >
         <Signal status={session.status} paused={session.paused} />
         <span className="session-text">
@@ -198,7 +200,7 @@ function SessionRow({ session, model, active, renaming }: SessionRowProps) {
           </span>
         </span>
         {session.unread && <span className="session-badge" role="img" aria-label="Something new" />}
-      </button>
+      </Main>
       <SessionControls session={session} />
       <button
         type="button"
