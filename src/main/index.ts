@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { release } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -30,7 +30,7 @@ import { BugLog } from './buglog'
 import { AgendaWatcher, askClaudeForAgenda } from './agenda'
 import { Bridge, socketPathFor } from './bridge'
 import { GoogleAccount, type GoogleStatus } from './google/account'
-import { loadGoogleClient } from './google/client'
+import { loadGoogleClient, readGoogleClient } from './google/client'
 import { ModelCatalogue } from './catalogue'
 import {
   checkSnapshot,
@@ -198,9 +198,11 @@ function makeGoogle(): GoogleAccount {
     client: () =>
       testGoogle
         ? { clientId: 'test' }
-        : isE2E
-          ? null
-          : loadGoogleClient([join(app.getPath('userData'), 'google-oauth.json'), join(resourcesDir, 'google-oauth.json')]),
+        : loadGoogleClient([
+            join(app.getPath('userData'), 'google-oauth.json'),
+            // Under test, only what the test gave.
+            ...(isE2E ? [] : [join(resourcesDir, 'google-oauth.json')])
+          ]),
     encrypt: isE2E ? sealTest : (plain) => safeStorage.encryptString(plain),
     decrypt: isE2E ? (sealed) => [...sealed.toString()].reverse().join('') : (sealed) => safeStorage.decryptString(sealed),
     // Under test, the stand-in Google signs in whoever asks, and no browser is opened.
@@ -451,6 +453,39 @@ function registerIpc(
     sendGoogleStatus()
     if (google.status().state === 'connected') void agenda.refresh().then(() => agenda.check())
     return google.status()
+  })
+
+  handle(IPC.importGoogleClient, async () => {
+    const status = (): GoogleStatus => google?.status() ?? { state: 'unconfigured' }
+    // Under test the file is named by the test, and no dialog is opened on the user's desktop.
+    let path = isE2E ? process.env.TELEGRAPH_TEST_IMPORT_FILE : undefined
+    if (!isE2E && window) {
+      const chosen = await dialog.showOpenDialog(window, {
+        title: 'Choose the file Google gave',
+        buttonLabel: 'Use this file',
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'Google client file', extensions: ['json'] }],
+        properties: ['openFile']
+      })
+      path = chosen.canceled ? undefined : chosen.filePaths[0]
+    }
+    if (!path) return { status: status() }
+    let text = ''
+    try {
+      text = readFileSync(path, 'utf8')
+    } catch {
+      return { status: status(), error: 'That file could not be read.' }
+    }
+    if (!readGoogleClient(text)) {
+      return {
+        status: status(),
+        error: 'That is not the file Google gives for a Desktop app. On the Clients page, create a client of type Desktop app, and download it.'
+      }
+    }
+    mkdirSync(app.getPath('userData'), { recursive: true })
+    writeFileSync(join(app.getPath('userData'), 'google-oauth.json'), text, { mode: 0o600 })
+    sendGoogleStatus()
+    return { status: status() }
   })
 
   handle(IPC.disconnectGoogle, async (): Promise<GoogleStatus> => {

@@ -123,5 +123,47 @@ test('says what is missing when Telegraph is not registered with Google', async 
   ;({ app, page } = await launch(workspace))
   await page.getByRole('button', { name: 'Connections' }).click()
   await expect(pane().getByRole('button', { name: 'Connect Google' })).toBeDisabled()
-  await expect(pane()).toContainText('not registered with Google yet')
+  await expect(pane()).toContainText('Google needs Telegraph to be registered once')
+})
+
+test.describe('setting up Google, once', () => {
+  async function unregistered(importFile: string): Promise<void> {
+    ;({ app, page } = await launch(workspace, { TELEGRAPH_TEST_IMPORT_FILE: importFile }))
+    await page.getByRole('button', { name: 'Connections' }).click()
+  }
+
+  test('walks through the registration with Google, a page at a time', async () => {
+    const { join } = await import('node:path')
+    await unregistered(join(workspace.root, 'none.json'))
+    const steps = pane().getByRole('list', { name: 'Setting up Google' }).getByRole('listitem')
+    await expect(steps).toHaveCount(4)
+    await expect(steps.nth(0)).toContainText('Create a project')
+    await expect(steps.nth(0).getByRole('button', { name: 'Open' })).toBeVisible()
+    await expect(steps.nth(3)).toContainText('Desktop app')
+  })
+
+  test('takes the file Google gave, and then connects', async () => {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const file = join(workspace.root, 'client_secret_123.apps.googleusercontent.com.json')
+    writeFileSync(file, JSON.stringify({ installed: { client_id: '123.apps.googleusercontent.com', client_secret: 'GOCSPX-test' } }))
+    await unregistered(file)
+    await pane().getByRole('button', { name: 'Choose the downloaded file' }).click()
+
+    await expect(pane().getByRole('button', { name: 'Connect Google' })).toBeEnabled()
+    await expect(pane().getByRole('list', { name: 'Setting up Google' })).toHaveCount(0)
+    const { readFileSync } = await import('node:fs')
+    expect(readFileSync(join(workspace.userData, 'google-oauth.json'), 'utf8')).toContain('123.apps.googleusercontent.com')
+  })
+
+  test('says so when the file is not the one Google gives', async () => {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const file = join(workspace.root, 'other.json')
+    writeFileSync(file, JSON.stringify({ web: { something: 'else' } }))
+    await unregistered(file)
+    await pane().getByRole('button', { name: 'Choose the downloaded file' }).click()
+    await expect(pane().getByRole('alert')).toContainText('not the file Google gives for a Desktop app')
+    await expect(pane().getByRole('button', { name: 'Connect Google' })).toBeDisabled()
+  })
 })

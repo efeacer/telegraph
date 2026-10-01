@@ -141,7 +141,34 @@ export function Connections({ agenda, google }: { agenda: AgendaState | null; go
   )
 }
 
+// Each page of Google Cloud that the registration takes, in order.
+const SETUP_STEPS = [
+  {
+    title: 'Create a project',
+    text: 'Sign in to Google Cloud with your Google account, and create a project named Telegraph. It is free.',
+    url: 'https://console.cloud.google.com/projectcreate'
+  },
+  {
+    title: 'Turn on Calendar and Gmail',
+    text: 'Press Enable on the Google Calendar API, then on the Gmail API, which opens next.',
+    url: 'https://console.cloud.google.com/apis/library/calendar-json.googleapis.com',
+    then: 'https://console.cloud.google.com/apis/library/gmail.googleapis.com'
+  },
+  {
+    title: 'Describe the app',
+    text: 'Press Get started. Name it Telegraph, choose External, and give your email. Then, under Audience, add your own email as a test user.',
+    url: 'https://console.cloud.google.com/auth/overview'
+  },
+  {
+    title: 'Make a key for Telegraph',
+    text: 'Create a client, choose Desktop app as its type, and download the file it offers.',
+    url: 'https://console.cloud.google.com/auth/clients/create'
+  }
+]
+
 function GoogleCard({ status }: { status: GoogleStatus }) {
+  const [problem, setProblem] = useState<string | null>(null)
+
   if (status.state === 'connected') {
     return (
       <div className="card-state is-connected">
@@ -154,6 +181,12 @@ function GoogleCard({ status }: { status: GoogleStatus }) {
       </div>
     )
   }
+
+  const chooseFile = async (): Promise<void> => {
+    const { error } = await window.telegraph.importGoogleClient()
+    setProblem(error ?? null)
+  }
+
   const connecting = status.state === 'connecting'
   return (
     <div className="card-state">
@@ -172,10 +205,43 @@ function GoogleCard({ status }: { status: GoogleStatus }) {
         </p>
       )}
       {status.state === 'unconfigured' && (
-        <p className="card-hint">
-          This copy of Telegraph is not registered with Google yet. Whoever set it up does that once; the steps are in
-          “Connecting Google” in its README.
-        </p>
+        <div className="setup">
+          <p className="card-hint">
+            Google needs Telegraph to be registered once before it lets you sign in. It takes about ten minutes, and
+            only once: after that, Connect Google is all there is to it.
+          </p>
+          <ol className="setup-steps" aria-label="Setting up Google">
+            {SETUP_STEPS.map((step, index) => (
+              <li key={step.title}>
+                <span className="setup-number" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <div>
+                  <h3>{step.title}</h3>
+                  <p className="card-hint">{step.text}</p>
+                </div>
+                <button
+                  type="button"
+                  className="quiet-button"
+                  onClick={() => {
+                    window.telegraph.openExternal(step.url)
+                    if (step.then) window.telegraph.openExternal(step.then)
+                  }}
+                >
+                  Open
+                </button>
+              </li>
+            ))}
+          </ol>
+          <button type="button" className="action-button" onClick={() => void chooseFile()}>
+            Choose the downloaded file
+          </button>
+          {problem && (
+            <p className="card-hint is-problem" role="alert">
+              {problem}
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

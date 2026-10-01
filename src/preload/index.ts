@@ -35,6 +35,7 @@ const api: TelegraphApi = {
   googleStatus: () => ipcRenderer.invoke(IPC.googleStatus),
   connectGoogle: () => ipcRenderer.invoke(IPC.connectGoogle),
   disconnectGoogle: () => ipcRenderer.invoke(IPC.disconnectGoogle),
+  importGoogleClient: () => ipcRenderer.invoke(IPC.importGoogleClient),
   onGoogleChanged: (listener) => subscribe(IPC.googleChanged, listener),
   notify: (notice) => ipcRenderer.send(IPC.notify, notice),
   withdrawNotice: (sessionId) => ipcRenderer.send(IPC.withdrawNotice, sessionId),

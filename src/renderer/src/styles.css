@@ -1935,3 +1935,41 @@ button:focus-visible {
   background: var(--night-raised);
 }
 
+
+/* Registering Telegraph with Google, a page at a time. */
+.setup {
+  margin-top: 12px;
+}
+
+.setup-steps {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-steps li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.setup-steps h3 {
+  margin: 1px 0 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.setup-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: var(--text-small);
+  font-weight: 650;
+  color: var(--glass);
+  background: var(--night-pressed);
+}

@@ -19,6 +19,7 @@ export const IPC = {
   googleStatus: 'google:status',
   connectGoogle: 'google:connect',
   disconnectGoogle: 'google:disconnect',
+  importGoogleClient: 'google:import-client',
   googleChanged: 'google:changed',
   theme: 'theme:get',
   setTheme: 'theme:set',

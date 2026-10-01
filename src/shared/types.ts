@@ -246,6 +246,8 @@ export interface TelegraphApi {
   /** Signs in to Google in the browser. Resolves once that is done, or has failed. */
   connectGoogle(): Promise<GoogleStatus>
   disconnectGoogle(): Promise<GoogleStatus>
+  /** Asks for the file Google gave when Telegraph was registered, and keeps it. Resolves to why not, if it was not kept. */
+  importGoogleClient(): Promise<{ status: GoogleStatus; error?: string }>
   onGoogleChanged(listener: (status: GoogleStatus) => void): () => void
   /** Tells the user, by a notice of the system, of a session they are not looking at. */
   notify(notice: Notice): void

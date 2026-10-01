@@ -133,7 +133,7 @@ test('lists the connections, and where to add more', async () => {
   const dialog = page.getByRole('dialog', { name: 'Connections' })
   // Kept out of the way, for those who use Claude's own connectors.
   await dialog.getByText('More for Claude').click()
-  await expect(dialog.getByRole('listitem')).toHaveText([/Gmail\s*Connected/, /Google Calendar\s*Connected/, /my-notes\s*Not reachable/])
+  await expect(dialog.locator('.connections-list').getByRole('listitem')).toHaveText([/Gmail\s*Connected/, /Google Calendar\s*Connected/, /my-notes\s*Not reachable/])
   await expect(dialog).toContainText(/Read 1 meeting at \d\d:\d\d/)
   await expect(dialog.getByRole('button', { name: 'Add Outlook, iCloud and others' })).toBeVisible()
   await expect(companion().getByRole('button', { name: 'Start a session in Companion' })).toBeVisible()
