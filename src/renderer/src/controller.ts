@@ -3,6 +3,7 @@ import { isModelId, modelsFor } from '@shared/models'
 import { describeNotice, noticeFor, type NoticeKind } from '@shared/notices'
 import { tidyName } from '@shared/names'
 import { escapePath } from '@shared/paths'
+import { reorder, step } from '@shared/reorder'
 import type { ThemeName } from '@shared/themes'
 import {
   QUIET_MS,
@@ -155,6 +156,56 @@ export async function initialize(): Promise<void> {
   setInterval(() => void refreshUsage(), USAGE_REFRESH_INTERVAL_MS)
   void refreshGit()
   void refreshUsage()
+}
+
+type Place = 'before' | 'after'
+
+/** Puts a project before or after another. The companion stays first, and a project put on it goes first. */
+export function moveProject(movedId: string, targetId: string, place: Place): void {
+  const ids = getState().projects.filter((project) => !project.companion).map((project) => project.id)
+  const onCompanion = !ids.includes(targetId)
+  const first = ids[0]
+  if (onCompanion && !first) return
+  orderProjects(onCompanion ? reorder(ids, movedId, first!, 'before') : reorder(ids, movedId, targetId, place))
+}
+
+export function nudgeProject(projectId: string, by: -1 | 1): void {
+  orderProjects(step(getState().projects.filter((project) => !project.companion).map((project) => project.id), projectId, by))
+}
+
+function orderProjects(ids: string[]): void {
+  setState((state) => {
+    const companion = state.projects.filter((project) => project.companion)
+    const ordered = ids.map((id) => state.projects.find((project) => project.id === id)).filter((project) => project !== undefined)
+    return { ...state, projects: [...companion, ...ordered] }
+  })
+  api.orderProjects(ids)
+}
+
+/** Puts a session before or after another of its project. Sessions stay in their project. */
+export function moveSession(movedId: string, targetId: string, place: Place): void {
+  const sessions = getState().sessions
+  const moved = sessions.find((session) => session.id === movedId)
+  const target = sessions.find((session) => session.id === targetId)
+  if (!moved || !target || moved.projectId !== target.projectId) return
+  orderSessions(moved.projectId, (ids) => reorder(ids, movedId, targetId, place))
+}
+
+export function nudgeSession(sessionId: string, by: -1 | 1): void {
+  const moved = getState().sessions.find((session) => session.id === sessionId)
+  if (moved) orderSessions(moved.projectId, (ids) => step(ids, sessionId, by))
+}
+
+/** Reorders the sessions of a project, leaving those of the others where they are. */
+function orderSessions(projectId: string, order: (ids: string[]) => string[]): void {
+  setState((state) => {
+    const ids = order(state.sessions.filter((session) => session.projectId === projectId).map((session) => session.id))
+    const queue = ids.map((id) => state.sessions.find((session) => session.id === id)!)
+    return {
+      ...state,
+      sessions: state.sessions.map((session) => (session.projectId === projectId ? queue.shift()! : session))
+    }
+  })
 }
 
 /** Takes the projects as another window left them. */

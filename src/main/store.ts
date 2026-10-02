@@ -136,6 +136,15 @@ export class StateStore {
     this.update({ ...this.state, projects, choices })
   }
 
+  /** Puts the projects in the order given, which must name each of them once, and no other. */
+  orderProjects(ids: unknown): void {
+    const { projects } = this.state
+    if (!Array.isArray(ids) || ids.length !== projects.length || new Set(ids).size !== ids.length) return
+    const ordered = ids.map((id) => projects.find((project) => project.id === id))
+    if (ordered.some((project) => project === undefined)) return
+    this.update({ ...this.state, projects: ordered as Project[] })
+  }
+
   /** Takes what the window says was chosen, which is checked like anything read from the file. */
   saveChoice(projectId: string, value: unknown): void {
     const choice = readChoice(value)

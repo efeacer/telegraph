@@ -21,6 +21,7 @@ const api: TelegraphApi = {
   addProject: () => ipcRenderer.invoke(IPC.addProject),
   removeProject: (projectId) => ipcRenderer.invoke(IPC.removeProject, projectId),
   openFolder: (projectId) => ipcRenderer.send(IPC.openFolder, projectId),
+  orderProjects: (projectIds) => ipcRenderer.send(IPC.orderProjects, projectIds),
   onStateChanged: (listener) => subscribe(IPC.stateChanged, listener),
   isCompanionHost: () => ipcRenderer.invoke(IPC.isCompanionHost),
   onCompanionHostChanged: (listener) => subscribe(IPC.companionHostChanged, listener),

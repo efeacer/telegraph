@@ -226,6 +226,8 @@ export interface TelegraphApi {
   removeProject(projectId: string): Promise<void>
   /** Opens the folder of a project in Finder, File Explorer or the file manager of the system. */
   openFolder(projectId: string): void
+  /** Keeps the projects in this order, which names each of them once. */
+  orderProjects(projectIds: string[]): void
   /** Called when another window has changed the projects. */
   onStateChanged(listener: () => void): () => void
   /** Whether the companion lives in this window: the first window opened that is still open. */

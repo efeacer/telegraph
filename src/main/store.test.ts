@@ -105,6 +105,26 @@ describe('StateStore', () => {
     expect(new StateStore(filePath).get().projects).toEqual([kept])
   })
 
+  it('keeps the projects in the order they were put in', () => {
+    const store = new StateStore(filePath)
+    const one = store.addProject('/tmp/one')
+    const two = store.addProject('/tmp/two')
+    const three = store.addProject('/tmp/three')
+    store.orderProjects([three.id, one.id, two.id])
+    expect(new StateStore(filePath).get().projects.map((project) => project.name)).toEqual(['three', 'one', 'two'])
+  })
+
+  it('takes no order that leaves out a project or names one it does not have', () => {
+    const store = new StateStore(filePath)
+    const one = store.addProject('/tmp/one')
+    const two = store.addProject('/tmp/two')
+    store.orderProjects([two.id])
+    store.orderProjects([two.id, one.id, 'gone'])
+    store.orderProjects([two.id, two.id])
+    store.orderProjects('nonsense' as never)
+    expect(store.get().projects.map((project) => project.name)).toEqual(['one', 'two'])
+  })
+
   it('sets an unreadable file aside instead of overwriting it', () => {
     const store = new StateStore(filePath)
     store.addProject('/tmp/one')

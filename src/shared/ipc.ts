@@ -3,6 +3,7 @@ export const IPC = {
   addProject: 'projects:add',
   removeProject: 'projects:remove',
   openFolder: 'projects:open-folder',
+  orderProjects: 'projects:order',
   stateChanged: 'state:changed',
   isCompanionHost: 'companion:is-host',
   companionHostChanged: 'companion:host-changed',

@@ -26,6 +26,8 @@ export function NameField({ sessionId, name }: { sessionId: string; name: string
       spellCheck={false}
       maxLength={200}
       onKeyDown={(event) => {
+        // The keys go back to the session as the name ends: the Enter that ends it must not go with them.
+        if (event.key === 'Enter' || event.key === 'Escape') event.preventDefault()
         if (event.key === 'Enter') finish(event.currentTarget.value)
         else if (event.key === 'Escape') finish(null)
         // Keys typed here are for the name, not for the window.

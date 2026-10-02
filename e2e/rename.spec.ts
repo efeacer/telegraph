@@ -82,6 +82,20 @@ test('goes back to the name of the program when the name is cleared', async () =
   await expect(row().locator('.session-title')).toHaveText('Shell')
 })
 
+test('sends nothing to the session with the Enter that ends the name', async () => {
+  await start(page, 'Shell')
+  await expect(terminal()).toContainText('$')
+  await page.locator('.terminal-view.is-active .xterm-helper-textarea').focus()
+  await page.keyboard.type('echo half typed')
+  await expect(terminal()).toContainText('echo half typed')
+  const before = await terminal().innerText()
+  await rename('Named')
+  await expect(page.locator('.terminal-view.is-active .xterm-helper-textarea')).toBeFocused()
+  await page.waitForTimeout(500)
+  // Still half typed: the Enter was the name's, not the shell's.
+  expect(await terminal().innerText()).toBe(before)
+})
+
 test('leaves the name as it was when renaming is given up', async () => {
   await startNamer()
   await rename('Not this', 'Escape')

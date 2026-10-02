@@ -585,6 +585,11 @@ function registerIpc(
     return project
   })
 
+  listenFrom(IPC.orderProjects, (event, projectIds: unknown) => {
+    store.orderProjects(projectIds)
+    for (const each of windows) if (each.webContents.id !== event.sender.id) each.webContents.send(IPC.stateChanged)
+  })
+
   handleFrom(IPC.removeProject, (event, projectId: string) => {
     store.removeProject(projectId)
     tellOthers(event)

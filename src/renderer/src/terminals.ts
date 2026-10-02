@@ -202,6 +202,17 @@ function takeFiles(element: HTMLElement, take: (files: File[]) => void): void {
     true
   )
 
+  // What is moved about in the sidebar is not for a terminal: nothing of it is typed.
+  element.addEventListener(
+    'drop',
+    (event) => {
+      if (!event.dataTransfer?.types.includes('application/x-telegraph-sidebar')) return
+      event.preventDefault()
+      event.stopPropagation()
+    },
+    true
+  )
+
   // Saying that the files are welcome is what makes the drop happen.
   element.addEventListener('dragover', (event) => {
     if (!holdsFiles(event.dataTransfer)) return

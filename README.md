@@ -43,6 +43,12 @@ list every one you want:
 Only `id`, `name` and `command` are needed. See
 [the design](docs/plans/2026-09-29-model-picker-design.md) for the rest.
 
+## Putting things in order
+
+Drag a project in the sidebar to move it, or a chat to move it within its
+project. With the keyboard, ⌥↑ and ⌥↓ move the one that has the keys. The
+order of projects is kept; the order of chats is the order of ⌘1 to ⌘9.
+
 ## Several windows
 
 Session > New Window (⇧⌘N) opens another window, as does the Dock icon's menu

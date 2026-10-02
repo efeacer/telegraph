@@ -1973,3 +1973,19 @@ button:focus-visible {
   color: var(--glass);
   background: var(--night-pressed);
 }
+
+/* Where what is dragged will go: a line before or after the row it is over. */
+.project.is-drop-before,
+.session.is-drop-before {
+  box-shadow: inset 0 2px 0 var(--glass);
+}
+
+.project.is-drop-after,
+.session.is-drop-after {
+  box-shadow: inset 0 -2px 0 var(--glass);
+}
+
+.project-head[draggable='true'],
+.session[draggable='true'] {
+  cursor: default;
+}
