@@ -25,7 +25,7 @@ import { nudgePrompt, type Meeting } from '@shared/agenda'
 import type { SessionSnapshot } from '@shared/types'
 import { E2E_ARGUMENT, IPC } from '@shared/ipc'
 import type { CreateSessionRequest, CreateSessionResult, MenuCommand } from '@shared/types'
-import { Attachments } from './attachments'
+import { Attachments, kindsOf } from './attachments'
 import { BugLog } from './buglog'
 import { AgendaWatcher, askClaudeForAgenda } from './agenda'
 import { Bridge, socketPathFor } from './bridge'
@@ -659,7 +659,21 @@ function registerIpc(
 
   listen(IPC.openExternal, (url: string) => openInBrowser(url))
 
-  handle(IPC.saveAttachment, (type: unknown, data: unknown) => attachments.save(type, data))
+  handle(IPC.saveAttachment, (type: unknown, data: unknown, name: unknown) => attachments.save(type, data, name))
+  handle(IPC.kindsOf, (paths: unknown) => kindsOf(paths))
+  handleFrom(IPC.chooseAttachments, async (event, projectPath: unknown) => {
+    // Under test the files are named by the test, and no dialog is opened on the user's desktop.
+    if (isE2E) return JSON.parse(process.env.TELEGRAPH_TEST_ATTACH_PATHS ?? '[]') as string[]
+    const asking = BrowserWindow.fromWebContents(event.sender)
+    if (!asking) return []
+    const chosen = await dialog.showOpenDialog(asking, {
+      title: 'Attach files or folders',
+      buttonLabel: 'Attach',
+      defaultPath: typeof projectPath === 'string' ? projectPath : undefined,
+      properties: ['openFile', 'openDirectory', 'multiSelections']
+    })
+    return chosen.canceled ? [] : chosen.filePaths
+  })
 
   handle(IPC.report, (report: unknown) => {
     const checked = checkWindowReport(report)

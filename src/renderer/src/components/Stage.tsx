@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import { arrange } from '../arrange'
-import { addProject, attachTerminalHost, dismissError, openConnections, toggleLayout } from '../controller'
+import { addProject, attachTerminalHost, chooseAttachments, dismissError, openConnections, toggleLayout } from '../controller'
 import { describeGit, shortenPath } from '../format'
 import { modelOf, orderedSessions, sessionLabel, statusLabel, type AppState } from '../store'
 import { ModelSwitch } from './ModelSwitch'
@@ -40,6 +40,19 @@ export function Stage({ state }: { state: AppState }) {
                 </span>
               )}
               {session && <SessionControls session={session} labelled />}
+              {session && session.status !== 'exited' && (
+                <span className="session-controls is-labelled">
+                  <button
+                    type="button"
+                    className="control-button"
+                    title="Hand files or folders to the session, for it to read. Dropping or pasting them on it does the same."
+                    onClick={() => void chooseAttachments(session.id)}
+                  >
+                    <Icon name="attach" />
+                    <span>Attach</span>
+                  </button>
+                </span>
+              )}
             </div>
             <div className="stage-meta">
               {git && <span>{describeGit(git)}</span>}

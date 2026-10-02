@@ -17,6 +17,8 @@ export const DEFAULT_LAUNCHERS: Launcher[] = [
     modelFlag: '--model',
     modelCommand: '/model',
     renameCommand: '/rename',
+    // Claude reads a file or folder that is mentioned, @path, into the chat.
+    attachAs: 'mention',
     providers: ['anthropic'],
     // Names that stand for the latest model of a kind, so they do not go out of date.
     models: [

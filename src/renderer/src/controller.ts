@@ -2,7 +2,7 @@ import { composeCommand } from '@shared/launchers'
 import { isModelId, modelsFor } from '@shared/models'
 import { describeNotice, noticeFor, type NoticeKind } from '@shared/notices'
 import { tidyName } from '@shared/names'
-import { escapePath } from '@shared/paths'
+import { formatAttachment } from '@shared/paths'
 import { reorder, step } from '@shared/reorder'
 import type { ThemeName } from '@shared/themes'
 import {
@@ -435,25 +435,57 @@ function sendSnapshot(): void {
 }
 
 /**
- * Hands files to the program in a session the way a terminal does: by typing
- * where they are. A pasted image is nowhere yet, and is kept as a file first.
+ * Hands files and folders to the program in a session the way a terminal
+ * does: by typing where they are. A pasted file that is nowhere yet, such as
+ * a screenshot, is kept as a file first.
  */
 async function attach(sessionId: string, files: File[]): Promise<void> {
   const paths: string[] = []
   const refused: string[] = []
   for (const file of files) {
-    const path = api.pathOf(file) || (await api.saveAttachment(file.type, await file.arrayBuffer()))
-    const typed = path ? escapePath(path) : null
-    if (typed) paths.push(typed)
+    const path = api.pathOf(file) || (await api.saveAttachment(file.type, await file.arrayBuffer(), file.name))
+    if (path) paths.push(path)
     else refused.push(file.name)
   }
+  await typeAttachments(sessionId, paths, refused)
+}
 
-  // With a space after each, so that what is typed next does not join the path.
-  if (paths.length > 0) terminals.paste(sessionId, paths.map((path) => `${path} `).join(''))
+/** Asks for files and folders, and hands them to the program in the active session. */
+export async function chooseAttachments(sessionId: string): Promise<void> {
+  const current = getState()
+  const session = current.sessions.find((candidate) => candidate.id === sessionId)
+  const project = current.projects.find((candidate) => candidate.id === session?.projectId)
+  if (!session || !project) return
+  const paths = await api.chooseAttachments(project.path)
+  await typeAttachments(sessionId, paths, [])
+  terminals.focus(sessionId)
+}
+
+/**
+ * Types the paths as the program in the session reads them: an agent such as
+ * Claude is told of each by a mention, which it reads the file or folder by.
+ */
+async function typeAttachments(sessionId: string, paths: string[], refused: string[]): Promise<void> {
+  const current = getState()
+  const session = current.sessions.find((candidate) => candidate.id === sessionId)
+  const style = current.launchers.find((launcher) => launcher.id === session?.launcherId)?.attachAs ?? 'path'
+  const kinds = paths.length > 0 ? await api.kindsOf(paths) : []
+  const typed: string[] = []
+  paths.forEach((path, index) => {
+    const written = formatAttachment(path, kinds[index] === 'folder', style)
+    if (written) typed.push(written)
+    else refused.push(path.split('/').at(-1) || path)
+  })
+
+  // With a space around each, so that a mention stands apart from what was typed before it, and what is typed next does not join the path.
+  if (typed.length > 0) {
+    const lead = style === 'mention' ? ' ' : ''
+    terminals.paste(sessionId, `${lead}${typed.map((path) => `${path} `).join('')}`)
+  }
   if (refused.length > 0) {
     setState((state) => ({
       ...state,
-      error: `Could not attach ${refused.join(', ')}. Only images can be pasted: a file of another kind has to be dropped, or copied as a file.`
+      error: `Could not attach ${refused.join(', ')}. It could not be kept as a file, or its name cannot be typed.`
     }))
   }
 }

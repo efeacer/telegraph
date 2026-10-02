@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test, type ElectronApplication, type Page } from '@playwright/test'
@@ -116,12 +116,28 @@ test('still pastes text', async () => {
   await expect(terminal()).toContainText('echo pasted-text')
 })
 
-test('says so when what was pasted cannot be attached', async () => {
+test('keeps a pasted file of any kind under the name it had', async () => {
+  await page.keyboard.type('test -f ')
   await paste([{ name: 'archive.zip', type: 'application/zip', bytes: [80, 75, 3, 4] }])
 
-  await expect(page.getByRole('alert')).toContainText('Could not attach archive.zip')
-  await page.keyboard.type('echo nothing-typed')
-  await expect(terminal()).toContainText(/\$ echo nothing-typed/)
+  await expect(terminal()).toContainText(/pasted-[0-9-]+-archive\.zip/)
+  await page.keyboard.type('&& echo found-$((40 + 2))')
+  await page.keyboard.press('Enter')
+  await expect(terminal()).toContainText('found-42')
+  const text = (await terminal().innerText()).replace(/\s*\n\s*/g, '')
+  kept.push(/(\/[^\s&]*telegraph-attachments\/pasted-[0-9-]+-archive\.zip)/.exec(text)![1]!)
+})
+
+test('marks a dropped folder by the slash at its end', async () => {
+  const folder = join(workspace.root, 'my folder')
+  mkdirSync(folder)
+  await page.keyboard.type('test -d ')
+  await drop(folder)
+  await expect(terminal()).toContainText('my\\ folder/')
+
+  await page.keyboard.type('&& echo found-$((40 + 2))')
+  await page.keyboard.press('Enter')
+  await expect(terminal()).toContainText('found-42')
 })
 
 test('hands Ctrl+V on to the program, which is how Claude looks at the clipboard', async () => {

@@ -1,3 +1,4 @@
+import type { AttachStyle } from './paths'
 import type { WindowReport } from './buglog'
 import type { Notice } from './notices'
 import type { ThemeName } from './themes'
@@ -144,6 +145,8 @@ export interface Launcher {
   modelCommand?: string
   /** Typed into a running session, followed by a name, to rename the chat. */
   renameCommand?: string
+  /** How a file dropped or pasted on a session is written into it. A path, as a shell takes it, by default. */
+  attachAs?: AttachStyle
   /** Typed to stop what the program is doing: Esc for agents, and Ctrl-C by default. */
   interruptKey?: string
   /** The providers in the catalogue whose models the program runs. */
@@ -278,8 +281,12 @@ export interface TelegraphApi {
   openExternal(url: string): void
   /** Where a file is that was dropped or pasted. Empty for one that is nowhere, like an image on the clipboard. */
   pathOf(file: File): string
-  /** Keeps a pasted image as a file. Resolves to where it is, or to null if it was not kept. */
-  saveAttachment(type: string, data: ArrayBuffer): Promise<string | null>
+  /** Keeps a pasted file that is nowhere yet. Resolves to where it is, or to null if it was not kept. */
+  saveAttachment(type: string, data: ArrayBuffer, name: string): Promise<string | null>
+  /** Whether each path is a folder or a file, or null for one that is not there. */
+  kindsOf(paths: string[]): Promise<Array<'file' | 'folder' | null>>
+  /** Asks the user for files and folders to attach. Resolves to none if they chose none. */
+  chooseAttachments(projectPath: string): Promise<string[]>
   /** Resolves to false when the report was not saved. */
   report(report: WindowReport): Promise<boolean>
   /** Tells the main process that the page reports its own errors from here on. */

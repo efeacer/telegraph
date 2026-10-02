@@ -142,6 +142,12 @@ describe('the launchers Telegraph comes with', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  it('mention files to Claude, which reads what is mentioned', () => {
+    const claudeLauncher = DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'claude')
+    expect(claudeLauncher?.attachAs).toBe('mention')
+    expect(DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'shell')?.attachAs).toBeUndefined()
+  })
+
   it('know how Claude is told to rename a chat', () => {
     const claudeLauncher = DEFAULT_LAUNCHERS.find((launcher) => launcher.id === 'claude')
     expect(claudeLauncher?.renameCommand).toBe('/rename')

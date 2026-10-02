@@ -32,6 +32,8 @@ export const IPC = {
   setBadge: 'notice:count',
   openSession: 'notice:open',
   saveAttachment: 'attachments:save',
+  kindsOf: 'attachments:kinds',
+  chooseAttachments: 'attachments:choose',
   gitStatus: 'git:status',
   createSession: 'session:create',
   closeSession: 'session:close',

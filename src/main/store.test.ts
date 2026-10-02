@@ -180,9 +180,19 @@ describe('parseState', () => {
       chats: { kind: 'claude', flag: '--resume' },
       reports: { kind: 'claude' },
       modelCommand: '/model',
-      renameCommand: '/rename'
+      renameCommand: '/rename',
+      attachAs: 'mention'
     }
     expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([launcher])
+  })
+
+  it('drops a way of attaching files it does not know', () => {
+    for (const attachAs of ['link', 42, null]) {
+      const launcher = { id: 'a', name: 'A', command: 'a', attachAs }
+      expect(parseState(JSON.stringify({ launchers: [launcher] })).launchers).toEqual([
+        { id: 'a', name: 'A', command: 'a' }
+      ])
+    }
   })
 
   it('drops a way of reporting it does not know', () => {

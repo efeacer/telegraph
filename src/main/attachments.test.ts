@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Attachments } from './attachments'
+import { Attachments, kindsOf } from './attachments'
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -56,26 +56,42 @@ describe('Attachments', () => {
     expect(statSync(path).mode & 0o777).toBe(0o600)
   })
 
-  it('takes the kinds of image an agent can read', () => {
-    for (const type of ['image/png', 'image/jpeg', 'image/gif', 'image/webp']) {
-      expect(open().save(type, PNG), type).not.toBeNull()
-    }
+  it('takes a file of any kind', () => {
+    expect(open().save('application/pdf', PNG)).toBe(join(directory, 'pasted-2026-09-29-181012.pdf'))
+    expect(open().save('text/plain', PNG)).toBe(join(directory, 'pasted-2026-09-29-181012.txt'))
+    expect(open().save('application/x-unheard-of', PNG)).toBe(join(directory, 'pasted-2026-09-29-181012.bin'))
+    // The second of the same kind in the same second.
+    expect(open().save('', PNG)).toBe(join(directory, 'pasted-2026-09-29-181012-2.bin'))
   })
 
-  it('refuses what is not an image', () => {
-    for (const type of ['application/zip', 'text/html', 'image/svg+xml', '', '../png']) {
-      expect(open().save(type, PNG), type).toBeNull()
-    }
-    expect(existsSync(directory)).toBe(false)
+  it('keeps the name the file had, so that the agent knows what it is', () => {
+    expect(open().save('application/pdf', PNG, 'Quarterly report.pdf')).toBe(
+      join(directory, 'pasted-2026-09-29-181012-Quarterly-report.pdf')
+    )
+    expect(open().save('', PNG, 'schema.sql')).toBe(join(directory, 'pasted-2026-09-29-181012-schema.sql'))
+  })
+
+  it('keeps nothing of a name that could lead elsewhere or would need escaping', () => {
+    const path = open().save('text/plain', PNG, '../../etc/pass wd;$(x).txt')!
+    expect(dirname(path)).toBe(directory)
+    expect(path.slice(directory.length + 1)).toMatch(/^[A-Za-z0-9._-]+$/)
+  })
+
+  it('names the file by its kind when its name has nothing to keep', () => {
+    expect(open().save('image/png', PNG, '…')).toBe(join(directory, 'pasted-2026-09-29-181012.png'))
+    // The name the clipboard gives every image says nothing.
+    expect(open().save('image/png', PNG, 'image.png')).toBe(join(directory, 'pasted-2026-09-29-181012-2.png'))
+    expect(open().save('image/png', PNG, 42 as never)).toBe(join(directory, 'pasted-2026-09-29-181012-3.png'))
   })
 
   it('refuses what is not data', () => {
     expect(open().save('image/png', 'text' as never)).toBeNull()
     expect(open().save('image/png', new Uint8Array(0))).toBeNull()
     expect(open().save(42 as never, PNG)).toBeNull()
+    expect(existsSync(directory)).toBe(false)
   })
 
-  it('refuses an image that is too large', () => {
+  it('refuses a file that is too large', () => {
     const attachments = open({ maxBytes: 16 })
     expect(attachments.save('image/png', new Uint8Array(17))).toBeNull()
     expect(attachments.save('image/png', new Uint8Array(16))).not.toBeNull()
@@ -91,7 +107,7 @@ describe('Attachments', () => {
     expect(open().save('image/png', PNG)).toBeNull()
   })
 
-  it('clears out the images of last week', () => {
+  it('clears out what was pasted last week', () => {
     mkdirSync(directory, { recursive: true })
     const old = join(directory, 'pasted-2026-09-20-100000.png')
     const recent = join(directory, 'pasted-2026-09-28-100000.png')
@@ -116,5 +132,19 @@ describe('Attachments', () => {
 
   it('has nothing to clear out before anything was pasted', () => {
     expect(() => open().clearOld()).not.toThrow()
+  })
+})
+
+describe('kindsOf', () => {
+  it('tells folders from files', () => {
+    mkdirSync(directory, { recursive: true })
+    const file = join(directory, 'notes.txt')
+    writeFileSync(file, 'notes')
+    expect(kindsOf([directory, file, join(directory, 'gone')])).toEqual(['folder', 'file', null])
+  })
+
+  it('reads nothing but a list of paths', () => {
+    expect(kindsOf('/' as never)).toEqual([])
+    expect(kindsOf([42, '', 'relative/path'] as never)).toEqual([null, null, null])
   })
 })
